@@ -18,7 +18,7 @@ export async function fetchStreams(forceRefresh = false) {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: 'NEW Availability 2026!A1:AC2500',
+    range: "'[NEW] Availability 2026'!A1:AC2500",
     valueRenderOption: 'UNFORMATTED_VALUE',
     dateTimeRenderOption: 'SERIAL_NUMBER',
   })
