@@ -8,15 +8,13 @@ export async function fetchStreams(forceRefresh = false) {
     if (cached) return cached
   }
 
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    },
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  })
+  const oauth2 = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+  )
+  oauth2.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN })
 
-  const sheets = google.sheets({ version: 'v4', auth })
+  const sheets = google.sheets({ version: 'v4', auth: oauth2 })
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
