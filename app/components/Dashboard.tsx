@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, LineChart, Line, ComposedChart,
 } from 'recharts'
 import { KpiCard } from './KpiCard'
 import { StatusBadge } from './StatusBadge'
@@ -56,7 +56,7 @@ const fmtShort = (n: number) => {
 
 type Page = 'overview' | 'streamers' | 'brands' | 'timeslots' | 'ask'
 
-const STATUS_OPTIONS = ['Paid', 'Invoice Sent', 'Invoice Pending', 'Scheduled']
+const STATUS_OPTIONS = ['All', 'Paid', 'Invoice Sent', 'Invoice Pending', 'Scheduled', 'Cancelled', 'Paid to Host, Pending Payment From Brand']
 const TIME_BUCKETS = ['12–14', '14–16', '16–18', '18–20', '20–22', '22–00']
 const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -93,7 +93,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
 
   const [page, setPage] = useState<Page>('overview')
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Paid'])
+  const [selectedStatus, setSelectedStatus] = useState<string>('All')
   const [selectedMonth, setSelectedMonth] = useState<string>('All')
   const [selectedPlatform, setSelectedPlatform] = useState<string>('All')
 
@@ -136,7 +136,7 @@ export default function Dashboard() {
 
   const filtered = useMemo(() => {
     return allStreams.filter(s => {
-      if (!selectedStatuses.includes(s.status ?? '')) return false
+      if (selectedStatus !== 'All' && s.status !== selectedStatus) return false
       if (selectedMonth !== 'All') {
         const d = new Date(s.date)
         const m = `${d.toLocaleString('en-SG', { month: 'short' })} ${d.getFullYear()}`
@@ -148,7 +148,7 @@ export default function Dashboard() {
       }
       return true
     })
-  }, [allStreams, selectedStatuses, selectedMonth, selectedPlatform])
+  }, [allStreams, selectedStatus, selectedMonth, selectedPlatform])
 
   const askClaude = async () => {
     if (!question.trim() || streaming) return
@@ -172,12 +172,6 @@ export default function Dashboard() {
     }
   }
 
-  const toggleStatus = (s: string) => {
-    setSelectedStatuses(prev =>
-      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
-    )
-  }
-
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: TEXT_SEC }}>
       Loading streams...
@@ -197,7 +191,7 @@ export default function Dashboard() {
         display: 'flex', flexDirection: 'column', padding: '24px 0',
       }}>
         <div style={{ padding: '0 20px 24px', borderBottom: `1px solid ${BORDER}` }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: ACCENT, letterSpacing: '-0.01em' }}>MAJORFORM</div>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: ACCENT, letterSpacing: '-0.01em', fontFamily: 'var(--font-space-grotesk)' }}>MAJORFORM</div>
           <div style={{ fontSize: '0.7rem', color: TEXT_SEC, marginTop: 2, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Livestream Dashboard</div>
         </div>
         <nav style={{ padding: '16px 0', flex: 1 }}>
@@ -233,18 +227,13 @@ export default function Dashboard() {
           padding: '16px 32px', borderBottom: `1px solid ${BORDER}`, background: SURFACE,
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 10,
         }}>
-          {/* Status toggles */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 4 }}>Status</span>
-            {STATUS_OPTIONS.map(s => (
-              <button key={s} onClick={() => toggleStatus(s)} style={{
-                padding: '3px 10px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
-                border: `1px solid ${selectedStatuses.includes(s) ? ACCENT : BORDER}`,
-                background: selectedStatuses.includes(s) ? 'rgba(200,245,74,0.1)' : 'transparent',
-                color: selectedStatuses.includes(s) ? ACCENT : TEXT_SEC,
-              }}>{s}</button>
-            ))}
-          </div>
+          {/* Status */}
+          <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} style={{
+            background: SURFACE_RAISED, border: `1px solid ${BORDER}`, color: TEXT_PRI,
+            padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
+          }}>
+            {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
+          </select>
 
           {/* Month */}
           <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={{
@@ -322,17 +311,22 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
   const topTalent = Object.entries(talentGmv).sort((a, b) => b[1] - a[1])[0]
 
   const monthlyData = useMemo(() => {
-    const m: Record<string, { tiktok: number; shopee: number }> = {}
+    const m: Record<string, { totalGmv: number; hours: number; count: number }> = {}
     streams.forEach(s => {
       const d = new Date(s.date)
       const key = `${d.toLocaleString('en-SG', { month: 'short' })} ${d.getFullYear()}`
-      if (!m[key]) m[key] = { tiktok: 0, shopee: 0 }
-      m[key].tiktok += s.tiktokGmv
-      m[key].shopee += s.shopeeGmv
+      if (!m[key]) m[key] = { totalGmv: 0, hours: 0, count: 0 }
+      m[key].totalGmv += s.totalGmv
+      m[key].hours += s.hours
+      m[key].count++
     })
     return Object.entries(m)
       .sort((a, b) => new Date(a[0]) > new Date(b[0]) ? 1 : -1)
-      .map(([name, v]) => ({ name, ...v }))
+      .map(([name, v]) => ({
+        name,
+        totalGmv: v.totalGmv,
+        gmvPerHour: v.hours > 0 ? v.totalGmv / v.hours : 0,
+      }))
   }, [streams])
 
   const totalTiktok = streams.reduce((a, s) => a + s.tiktokGmv, 0)
@@ -363,16 +357,29 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
       {/* Charts */}
       <div style={{ display: 'flex', gap: 16 }}>
         <div style={{ flex: 2, ...cardStyle }}>
-          <SectionLabel>Monthly GMV</SectionLabel>
+          <SectionLabel>Monthly Total GMV &amp; GMV / Hour</SectionLabel>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <ComposedChart data={monthlyData} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
               <XAxis dataKey="name" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-              <Bar dataKey="tiktok" name="TikTok" stackId="a" fill={TIKTOK_COLOR} radius={[0,0,0,0]} />
-              <Bar dataKey="shopee" name="Shopee" stackId="a" fill={SHOPEE_COLOR} radius={[3,3,0,0]} />
-            </BarChart>
+              <YAxis yAxisId="gmv" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
+              <YAxis yAxisId="rate" orientation="right" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
+              <Tooltip
+                contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }}
+                formatter={(v, name) => [fmtShort(Number(v)), name === 'totalGmv' ? 'Total GMV' : 'GMV / Hour']}
+                cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+              />
+              <Bar yAxisId="gmv" dataKey="totalGmv" name="totalGmv" fill={ACCENT} radius={[3,3,0,0]} opacity={0.85} />
+              <Line yAxisId="rate" dataKey="gmvPerHour" name="gmvPerHour" stroke="#60A5FA" strokeWidth={2} dot={{ fill: '#60A5FA', r: 3 }} />
+            </ComposedChart>
           </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 10, height: 10, background: ACCENT, borderRadius: 2, display: 'inline-block' }} /> Total GMV
+            </span>
+            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 10, height: 2, background: '#60A5FA', display: 'inline-block' }} /> GMV / Hour
+            </span>
+          </div>
         </div>
         <div style={{ flex: 1, ...cardStyle }}>
           <SectionLabel>Platform Split</SectionLabel>
