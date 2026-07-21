@@ -656,6 +656,29 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
 
 // ─── Planning ────────────────────────────────────────────────────────────────
 
+function renderMd(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} style={{ color: TEXT_PRI, fontWeight: 600 }}>{part.slice(2, -2)}</strong>
+    }
+    return part
+  })
+}
+
+function MdText({ text, style }: { text: string; style?: React.CSSProperties }) {
+  const lines = text.split('\n')
+  return (
+    <div style={style}>
+      {lines.map((line, i) => (
+        <div key={i} style={{ minHeight: line.trim() === '' ? '0.5em' : undefined }}>
+          {renderMd(line)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function isTBC(s: Stream): boolean {
   const flag = (s.flag ?? '').toUpperCase()
   const status = (s.status ?? '').toUpperCase()
@@ -706,6 +729,7 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
   const [analysis, setAnalysis] = useState('')
   const [analysing, setAnalysing] = useState(false)
   const [analysed, setAnalysed] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
 
   const runAnalysis = useCallback(async () => {
     if (analysing || planned.length === 0) return
@@ -830,22 +854,37 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
         </div>
       </div>
 
-      {/* Planned schedule table */}
+      {/* Planned schedule table — collapsible */}
       <div style={cardStyle}>
-        <SectionLabel>Planned Schedule</SectionLabel>
-        <Table
-          headers={['Date', 'Day', 'Time', 'Talent', 'Brand', 'Platform', 'Hours', 'Status']}
-          rows={planned.map(s => [
-            new Date(s.date).toLocaleDateString('en-SG'),
-            s.dayOfWeek,
-            `${String(s.startHour).padStart(2,'0')}:${String(s.startMinute).padStart(2,'0')}–${s.endIsNextDay ? '00:00' : `${String(s.endHour).padStart(2,'0')}:${String(s.endMinute).padStart(2,'0')}`}`,
-            s.talent,
-            s.brand ?? '—',
-            s.platform ?? '—',
-            s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—',
-            <StatusBadge key="s" status={s.status} />,
-          ])}
-        />
+        <button
+          onClick={() => setScheduleOpen(o => !o)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          }}
+        >
+          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>
+            Planned Schedule ({planned.length})
+          </span>
+          <span style={{ color: TEXT_SEC, fontSize: '0.75rem', transition: 'transform 0.15s', display: 'inline-block', transform: scheduleOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+        </button>
+        {scheduleOpen && (
+          <div style={{ marginTop: 16 }}>
+            <Table
+              headers={['Date', 'Day', 'Time', 'Talent', 'Brand', 'Platform', 'Hours', 'Status']}
+              rows={planned.map(s => [
+                new Date(s.date).toLocaleDateString('en-SG'),
+                s.dayOfWeek,
+                `${String(s.startHour).padStart(2,'0')}:${String(s.startMinute).padStart(2,'0')}–${s.endIsNextDay ? '00:00' : `${String(s.endHour).padStart(2,'0')}:${String(s.endMinute).padStart(2,'0')}`}`,
+                s.talent,
+                s.brand ?? '—',
+                s.platform ?? '—',
+                s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—',
+                <StatusBadge key="s" status={s.status} />,
+              ])}
+            />
+          </div>
+        )}
       </div>
 
       {/* Claude analysis */}
@@ -878,18 +917,16 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
                   <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 10 }}>
                     {s.title}
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: TEXT_PRI, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                    {s.body}
-                    {i === sections.length - 1 && analysing && (
-                      <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>
-                    )}
-                  </div>
+                  <MdText text={s.body} style={{ fontSize: '0.85rem', color: TEXT_SEC, lineHeight: 1.8 }} />
+                  {i === sections.length - 1 && analysing && (
+                    <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>
+                  )}
                 </div>
               ))}
             </div>
           ) : analysis ? (
-            <div style={{ ...cardStyle, fontSize: '0.875rem', color: TEXT_PRI, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-              {analysis}
+            <div style={cardStyle}>
+              <MdText text={analysis} style={{ fontSize: '0.875rem', color: TEXT_SEC, lineHeight: 1.8 }} />
               {analysing && <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>}
             </div>
           ) : null}

@@ -91,7 +91,8 @@ Format your response in clear sections using these exact headers:
 ## Recommendations
 
 Be specific — reference streamer names, brands, days, times, and SGD numbers.
-Flag anything that looks risky based on historical data (bad timeslots, overloaded streamers, untested combos).
+IMPORTANT: The historical data covers ALL completed streams from the earliest available date. Use this full picture — do not assume a combo is untested unless it genuinely has zero entries in the talent × brand combos table.
+Flag anything that looks risky based on historical data (bad timeslots, overloaded streamers, truly untested combos).
 Keep each section tight — 3–5 bullet points max. Use bullet points (–) not numbers.`
 
   const userContent = `HISTORICAL TIMESLOT PERFORMANCE (by avg GMV):
@@ -103,8 +104,8 @@ ${JSON.stringify(talentSummary, null, 2)}
 HISTORICAL BRAND PERFORMANCE:
 ${JSON.stringify(brandSummary, null, 2)}
 
-HISTORICAL TALENT × BRAND COMBOS (top pairings):
-${JSON.stringify(tbSummary.slice(0, 20), null, 2)}
+HISTORICAL TALENT × BRAND COMBOS (all pairings with stream count and avg GMV):
+${JSON.stringify(tbSummary, null, 2)}
 
 PLANNED STREAMS (TBC — ${plannedSummary.length} streams):
 ${JSON.stringify(plannedSummary, null, 2)}
