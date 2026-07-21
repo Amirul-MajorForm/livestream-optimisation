@@ -36,14 +36,36 @@ interface Stream {
   eventId: string | null
 }
 
-const ACCENT = '#C8F54A'
+const ACCENT = 'var(--ds-accent)'
 const TIKTOK_COLOR = '#FF4D6D'
 const SHOPEE_COLOR = '#EE4D2D'
-const BORDER = '#2A2A2A'
-const SURFACE = '#111111'
-const SURFACE_RAISED = '#1A1A1A'
-const TEXT_SEC = '#888888'
-const TEXT_PRI = '#F0F0F0'
+const BORDER = 'var(--ds-border)'
+const SURFACE = 'var(--ds-surface)'
+const SURFACE_RAISED = 'var(--ds-surface-raised)'
+const TEXT_SEC = 'var(--ds-text-sec)'
+const TEXT_PRI = 'var(--ds-text-pri)'
+
+const DARK_VARS = {
+  '--ds-bg': '#0A0A0A',
+  '--ds-surface': '#111111',
+  '--ds-surface-raised': '#1A1A1A',
+  '--ds-border': '#2A2A2A',
+  '--ds-accent': '#C8F54A',
+  '--ds-text-pri': '#F0F0F0',
+  '--ds-text-sec': '#888888',
+  '--ds-accent-raw': '200,245,74',
+} as React.CSSProperties
+
+const LIGHT_VARS = {
+  '--ds-bg': '#F5F5F2',
+  '--ds-surface': '#FFFFFF',
+  '--ds-surface-raised': '#EEEEEA',
+  '--ds-border': '#E0E0DC',
+  '--ds-accent': '#4E7200',
+  '--ds-text-pri': '#111111',
+  '--ds-text-sec': '#666666',
+  '--ds-accent-raw': '78,114,0',
+} as React.CSSProperties
 
 const fmt = (n: number) =>
   'SGD ' + n.toLocaleString('en-SG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -97,6 +119,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string>('All')
   const [selectedPlatform, setSelectedPlatform] = useState<string>('All')
 
+  const [isDark, setIsDark] = useState(true)
   const [expandedTalent, setExpandedTalent] = useState<string | null>(null)
   const [brandAccountFilter, setBrandAccountFilter] = useState<string>('All')
 
@@ -172,19 +195,21 @@ export default function Dashboard() {
     }
   }
 
+  const themeVars = isDark ? DARK_VARS : LIGHT_VARS
+
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: TEXT_SEC }}>
+    <div style={{ ...themeVars, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: TEXT_SEC, background: 'var(--ds-bg)' }}>
       Loading streams...
     </div>
   )
   if (error) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#F87171' }}>
+    <div style={{ ...themeVars, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#F87171', background: 'var(--ds-bg)' }}>
       {error}
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#0A0A0A' }}>
+    <div style={{ ...themeVars, display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--ds-bg)' } as React.CSSProperties}>
       {/* Sidebar */}
       <aside style={{
         width: 220, flexShrink: 0, background: SURFACE, borderRight: `1px solid ${BORDER}`,
@@ -257,6 +282,16 @@ export default function Dashboard() {
                 Synced {new Date(cachedAt).toLocaleTimeString('en-SG')}
               </span>
             )}
+            <button onClick={() => setIsDark(d => !d)} style={{
+              padding: '5px 12px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
+              border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
+              transition: 'border-color 0.1s',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = isDark ? '#C8F54A' : '#4E7200')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
+            >
+              {isDark ? '☀ Light' : '☾ Dark'}
+            </button>
             <button onClick={() => load(true)} disabled={refreshing} style={{
               padding: '5px 14px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
               border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
@@ -902,10 +937,11 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
           )}
 
           {sections.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'row', gap: 16, overflowX: 'auto', paddingBottom: 4 }}>
               {sections.map((s, i) => (
                 <div key={i} style={{
                   ...cardStyle,
+                  minWidth: 280, flex: '1 1 280px',
                   borderLeft: `3px solid ${
                     s.title.toLowerCase().includes('risk') || s.title.toLowerCase().includes('flag')
                       ? '#F87171'
