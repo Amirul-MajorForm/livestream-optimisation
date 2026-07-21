@@ -54,7 +54,7 @@ const fmtShort = (n: number) => {
   return fmt(n)
 }
 
-type Page = 'overview' | 'streamers' | 'brands' | 'timeslots' | 'ask'
+type Page = 'overview' | 'streamers' | 'brands' | 'timeslots' | 'ask' | 'planning'
 
 const STATUS_OPTIONS = ['All', 'Paid', 'Invoice Sent', 'Invoice Pending', 'Scheduled', 'Cancelled', 'Paid to Host, Pending Payment From Brand']
 const TIME_BUCKETS = ['12–14', '14–16', '16–18', '18–20', '20–22', '22–00']
@@ -195,10 +195,10 @@ export default function Dashboard() {
           <div style={{ fontSize: '0.7rem', color: TEXT_SEC, marginTop: 2, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Livestream Dashboard</div>
         </div>
         <nav style={{ padding: '16px 0', flex: 1 }}>
-          {(['overview', 'streamers', 'brands', 'timeslots', 'ask'] as Page[]).map(p => {
+          {(['overview', 'streamers', 'brands', 'timeslots', 'planning', 'ask'] as Page[]).map(p => {
             const labels: Record<Page, string> = {
               overview: 'Overview', streamers: 'Streamers', brands: 'Brands',
-              timeslots: 'Timeslots', ask: 'Ask Claude',
+              timeslots: 'Timeslots', planning: 'Planning', ask: 'Ask Claude',
             }
             const active = page === p
             return (
@@ -276,6 +276,7 @@ export default function Dashboard() {
           {page === 'streamers' && <StreamersPage streams={filtered} expanded={expandedTalent} setExpanded={setExpandedTalent} />}
           {page === 'brands' && <BrandsPage streams={filtered} accountFilter={brandAccountFilter} setAccountFilter={setBrandAccountFilter} />}
           {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
+          {page === 'planning' && <PlanningPage allStreams={allStreams} />}
           {page === 'ask' && (
             <AskPage
               streams={filtered}
@@ -649,6 +650,251 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
           rows={bucketSummary.map(b => [b.bucket, b.count, b.count > 0 ? fmt(b.avg) : '—'])}
         />
       </div>
+    </div>
+  )
+}
+
+// ─── Planning ────────────────────────────────────────────────────────────────
+
+function isTBC(s: Stream): boolean {
+  const flag = (s.flag ?? '').toUpperCase()
+  const status = (s.status ?? '').toUpperCase()
+  const notes = (s.notes ?? '').toUpperCase()
+  return (
+    flag.includes('TBC') ||
+    status.includes('TBC') ||
+    status === 'SCHEDULED' ||
+    notes.includes('TBC')
+  )
+}
+
+function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
+  const planned = useMemo(() => {
+    const now = new Date()
+    return allStreams.filter(s => {
+      if (!isTBC(s)) return false
+      const d = new Date(s.date)
+      return d >= now
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [allStreams])
+
+  const historical = useMemo(() =>
+    allStreams.filter(s => ['Paid', 'Invoice Sent', 'Invoice Pending'].includes(s.status ?? ''))
+  , [allStreams])
+
+  const byTalent = useMemo(() => {
+    const m: Record<string, number> = {}
+    planned.forEach(s => { m[s.talent] = (m[s.talent] ?? 0) + 1 })
+    return Object.entries(m).sort((a, b) => b[1] - a[1])
+  }, [planned])
+
+  const byBrand = useMemo(() => {
+    const m: Record<string, number> = {}
+    planned.forEach(s => { if (s.brand) m[s.brand] = (m[s.brand] ?? 0) + 1 })
+    return Object.entries(m).sort((a, b) => b[1] - a[1])
+  }, [planned])
+
+  const byTimeslot = useMemo(() => {
+    const m: Record<string, number> = {}
+    planned.forEach(s => {
+      const b = getBucket(s.startHour)
+      if (b) { const key = `${s.dayOfWeek} ${b}`; m[key] = (m[key] ?? 0) + 1 }
+    })
+    return Object.entries(m).sort((a, b) => b[1] - a[1])
+  }, [planned])
+
+  const [analysis, setAnalysis] = useState('')
+  const [analysing, setAnalysing] = useState(false)
+  const [analysed, setAnalysed] = useState(false)
+
+  const runAnalysis = useCallback(async () => {
+    if (analysing || planned.length === 0) return
+    setAnalysis('')
+    setAnalysing(true)
+    setAnalysed(false)
+    try {
+      const res = await fetch('/api/plan-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planned, historical }),
+      })
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        setAnalysis(a => a + decoder.decode(value))
+      }
+      setAnalysed(true)
+    } finally {
+      setAnalysing(false)
+    }
+  }, [planned, historical, analysing])
+
+  const months = useMemo(() => {
+    const s = new Set<string>()
+    planned.forEach(p => {
+      const d = new Date(p.date)
+      s.add(`${d.toLocaleString('en-SG', { month: 'long' })} ${d.getFullYear()}`)
+    })
+    return Array.from(s).join(', ')
+  }, [planned])
+
+  // Parse markdown-ish analysis into sections
+  const sections = useMemo(() => {
+    if (!analysis) return []
+    return analysis.split(/\n##\s+/).filter(Boolean).map(block => {
+      const lines = block.split('\n')
+      const title = lines[0].trim()
+      const body = lines.slice(1).join('\n').trim()
+      return { title, body }
+    })
+  }, [analysis])
+
+  if (planned.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, color: TEXT_SEC, gap: 8 }}>
+        <div style={{ fontSize: '1.5rem' }}>📋</div>
+        <div>No upcoming TBC / Scheduled streams found.</div>
+        <div style={{ fontSize: '0.75rem' }}>Streams with status "Scheduled" or flag "TBC" and a future date will appear here.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: TEXT_PRI, marginBottom: 4, fontFamily: 'var(--font-space-grotesk)' }}>
+            Planning — {planned.length} Upcoming Streams
+          </h2>
+          <p style={{ color: TEXT_SEC, fontSize: '0.8rem' }}>{months}</p>
+        </div>
+        <button onClick={runAnalysis} disabled={analysing} style={{
+          padding: '8px 18px', background: analysing ? 'transparent' : ACCENT,
+          border: `1px solid ${analysing ? BORDER : ACCENT}`,
+          color: analysing ? TEXT_SEC : '#0A0A0A',
+          borderRadius: 6, fontWeight: 700, fontSize: '0.8rem', cursor: analysing ? 'not-allowed' : 'pointer',
+        }}>
+          {analysing ? 'Analysing...' : analysed ? '↻ Re-analyse' : '✦ Analyse with Claude'}
+        </button>
+      </div>
+
+      {/* KPI row */}
+      <div style={{ display: 'flex', gap: 16 }}>
+        <KpiCard label="Planned Streams" value={String(planned.length)} />
+        <KpiCard label="Streamers" value={String(byTalent.length)} />
+        <KpiCard label="Brands" value={String(byBrand.length)} />
+        <KpiCard label="Time Slots" value={String(byTimeslot.length)} />
+      </div>
+
+      {/* Tables row */}
+      <div style={{ display: 'flex', gap: 16 }}>
+        {/* By streamer */}
+        <div style={{ flex: 1, ...cardStyle }}>
+          <SectionLabel>Streams per Streamer</SectionLabel>
+          <Table
+            headers={['Streamer', 'Planned', 'Bar']}
+            rows={byTalent.map(([name, count]) => [
+              name,
+              count,
+              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  height: 6, borderRadius: 3,
+                  width: `${Math.round((count / byTalent[0][1]) * 100)}%`,
+                  minWidth: 4, background: ACCENT, maxWidth: 120,
+                }} />
+              </div>,
+            ])}
+          />
+        </div>
+
+        {/* By brand */}
+        <div style={{ flex: 1, ...cardStyle }}>
+          <SectionLabel>Streams per Brand</SectionLabel>
+          <Table
+            headers={['Brand', 'Planned', 'Bar']}
+            rows={byBrand.map(([name, count]) => [
+              name,
+              count,
+              <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  height: 6, borderRadius: 3,
+                  width: `${Math.round((count / byBrand[0][1]) * 100)}%`,
+                  minWidth: 4, background: '#60A5FA', maxWidth: 120,
+                }} />
+              </div>,
+            ])}
+          />
+        </div>
+      </div>
+
+      {/* Planned schedule table */}
+      <div style={cardStyle}>
+        <SectionLabel>Planned Schedule</SectionLabel>
+        <Table
+          headers={['Date', 'Day', 'Time', 'Talent', 'Brand', 'Platform', 'Hours', 'Status']}
+          rows={planned.map(s => [
+            new Date(s.date).toLocaleDateString('en-SG'),
+            s.dayOfWeek,
+            `${String(s.startHour).padStart(2,'0')}:${String(s.startMinute).padStart(2,'0')}–${s.endIsNextDay ? '00:00' : `${String(s.endHour).padStart(2,'0')}:${String(s.endMinute).padStart(2,'0')}`}`,
+            s.talent,
+            s.brand ?? '—',
+            s.platform ?? '—',
+            s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—',
+            <StatusBadge key="s" status={s.status} />,
+          ])}
+        />
+      </div>
+
+      {/* Claude analysis */}
+      {(analysing || analysis) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>
+            Claude Analysis
+          </div>
+
+          {analysing && !analysis && (
+            <div style={{ ...cardStyle, color: TEXT_SEC, fontSize: '0.875rem' }}>
+              Analysing {planned.length} planned streams against {historical.length} historical streams
+              <span className="cursor-blink" style={{ color: ACCENT }}> ▋</span>
+            </div>
+          )}
+
+          {sections.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
+              {sections.map((s, i) => (
+                <div key={i} style={{
+                  ...cardStyle,
+                  borderLeft: `3px solid ${
+                    s.title.toLowerCase().includes('risk') || s.title.toLowerCase().includes('flag')
+                      ? '#F87171'
+                      : s.title.toLowerCase().includes('recommend')
+                      ? ACCENT
+                      : '#60A5FA'
+                  }`,
+                }}>
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 10 }}>
+                    {s.title}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: TEXT_PRI, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {s.body}
+                    {i === sections.length - 1 && analysing && (
+                      <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : analysis ? (
+            <div style={{ ...cardStyle, fontSize: '0.875rem', color: TEXT_PRI, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+              {analysis}
+              {analysing && <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   )
 }
