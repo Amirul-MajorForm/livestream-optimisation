@@ -68,11 +68,22 @@ export async function POST(req: Request) {
     return { talent, brand, streams: gmvs.length, avgGmv: Math.round(gmvs.reduce((a, b) => a + b, 0) / gmvs.length) }
   }).sort((a, b) => b.avgGmv - a.avgGmv)
 
+  const getMegaType = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const day = d.getDate()
+    const month = d.getMonth() + 1
+    const isDoubleDigit = day === month || day === month - 1
+    const isMidMonth = day === 15 || day === 14
+    const isPayday = day === 25 || day === 24
+    return (isDoubleDigit || isMidMonth || isPayday) ? 'Mega' : 'BAU'
+  }
+
   const plannedSummary = planned.map((s: { date: string; dayOfWeek: string; startHour: number; startMinute: number; talent: string; brand: string | null; platform: string | null; hours: number }) => ({
     date: new Date(s.date).toLocaleDateString('en-SG'),
     day: s.dayOfWeek,
     time: `${String(s.startHour).padStart(2, '0')}:${String(s.startMinute).padStart(2, '0')}`,
     slot: `${s.dayOfWeek} ${bucket(s.startHour)}`,
+    dayType: getMegaType(s.date),
     talent: s.talent,
     brand: s.brand,
     platform: s.platform,
@@ -83,6 +94,11 @@ export async function POST(req: Request) {
 You will be given historical performance data (completed streams with GMV) and a set of PLANNED streams (TBC).
 Your job: analyse the planned streams against historical patterns and flag issues, risks, and opportunities.
 
+KEY CONTEXT — DAY TYPES:
+- Mega days = double-digit days (where day number equals month number, e.g. 6 June = 6/6, 7 July = 7/7), mid-month (14th and 15th), and payday (24th and 25th), PLUS the day before each of those dates. These days historically drive significantly higher GMV.
+- BAU days = all other days.
+Each planned stream is tagged with its dayType (Mega or BAU). Factor this heavily into your analysis — scheduling strong brands/streamers on BAU days when Mega dates are available is a missed opportunity, and vice versa (depleting a brand's best talent on BAU days before Mega dates).
+
 Format your response in clear sections using these exact headers:
 ## Overview
 ## Streamer Load Analysis
@@ -90,9 +106,9 @@ Format your response in clear sections using these exact headers:
 ## Timeslot Risk Flags
 ## Recommendations
 
-Be specific — reference streamer names, brands, days, times, and SGD numbers.
+Be specific — reference streamer names, brands, days, times, SGD numbers, and Mega/BAU day classification.
 IMPORTANT: The historical data covers ALL completed streams from the earliest available date. Use this full picture — do not assume a combo is untested unless it genuinely has zero entries in the talent × brand combos table.
-Flag anything that looks risky based on historical data (bad timeslots, overloaded streamers, truly untested combos).
+Flag anything that looks risky based on historical data (bad timeslots, overloaded streamers, truly untested combos, Mega day misalignment).
 Keep each section tight — 3–5 bullet points max. Use bullet points (–) not numbers.`
 
   const userContent = `HISTORICAL TIMESLOT PERFORMANCE (by avg GMV):

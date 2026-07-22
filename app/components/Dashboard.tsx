@@ -98,6 +98,17 @@ function getBucket(hour: number): string | null {
   return null
 }
 
+// Mega day = double-digit day (day===month), mid-month (14/15), or payday (24/25) — and the day before each
+function getDayType(dateStr: string): 'Mega' | 'BAU' {
+  const d = new Date(dateStr)
+  const day = d.getDate()
+  const month = d.getMonth() + 1
+  const isDoubleDigit = day === month || day === month - 1
+  const isMidMonth = day === 15 || day === 14
+  const isPayday = day === 25 || day === 24
+  return (isDoubleDigit || isMidMonth || isPayday) ? 'Mega' : 'BAU'
+}
+
 function heatColor(ratio: number): string {
   // interpolate red (#F87171) → green (#4ADE80)
   if (ratio <= 0) return 'transparent'
@@ -489,6 +500,16 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
   }, [streams])
   const topTalent = Object.entries(talentGmv).sort((a, b) => b[1] - a[1])[0]
 
+  const megaBau = useMemo(() => {
+    const mega = streams.filter(s => getDayType(s.date) === 'Mega')
+    const bau = streams.filter(s => getDayType(s.date) === 'BAU')
+    const megaGmv = mega.reduce((a, s) => a + s.totalGmv, 0)
+    const bauGmv = bau.reduce((a, s) => a + s.totalGmv, 0)
+    const megaAvg = mega.length > 0 ? megaGmv / mega.length : 0
+    const bauAvg = bau.length > 0 ? bauGmv / bau.length : 0
+    return { mega, bau, megaGmv, bauGmv, megaAvg, bauAvg }
+  }, [streams])
+
   const monthlyData = useMemo(() => {
     const m: Record<string, { totalGmv: number; hours: number; count: number }> = {}
     streams.forEach(s => {
@@ -515,10 +536,11 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
     { name: 'Shopee', value: totalShopee },
   ].filter(d => d.value > 0)
 
-  const sevenDaysAgo = new Date()
+  const now = new Date()
+  const sevenDaysAgo = new Date(now)
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const recent = [...streams]
-    .filter(s => new Date(s.date) >= sevenDaysAgo)
+    .filter(s => { const d = new Date(s.date); return d >= sevenDaysAgo && d <= now })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   return (
@@ -532,6 +554,46 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
           value={topTalent ? topTalent[0] : '—'}
           sub={topTalent ? fmtShort(topTalent[1]) : undefined}
         />
+      </div>
+
+      {/* Mega vs BAU */}
+      <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ flex: 1, ...cardStyle, borderLeft: `3px solid #F59E0B` }}>
+          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#F59E0B', marginBottom: 6 }}>🔥 Mega Days</div>
+          <div style={{ display: 'flex', gap: 24 }}>
+            <div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{megaBau.mega.length}</div>
+              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>streams</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.megaGmv)}</div>
+              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>total GMV</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.megaAvg)}</div>
+              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>avg GMV/stream</div>
+            </div>
+          </div>
+          <div style={{ fontSize: '0.65rem', color: TEXT_SEC, marginTop: 8 }}>Double-digit (6.6, 7.7…) · Mid-month (14–15) · Payday (24–25) + day before each</div>
+        </div>
+        <div style={{ flex: 1, ...cardStyle, borderLeft: `3px solid ${BORDER}` }}>
+          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 6 }}>📅 BAU Days</div>
+          <div style={{ display: 'flex', gap: 24 }}>
+            <div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{megaBau.bau.length}</div>
+              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>streams</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.bauGmv)}</div>
+              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>total GMV</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.bauAvg)}</div>
+              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>avg GMV/stream</div>
+            </div>
+          </div>
+          <div style={{ fontSize: '0.65rem', color: TEXT_SEC, marginTop: 8 }}>All other days</div>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 16 }}>
@@ -742,7 +804,12 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
 
 // ─── Brands ────────────────────────────────────────────────────────────────
 
+type BrandSortCol = 'brand' | 'count' | 'tiktokGmv' | 'shopeeGmv' | 'totalGmv' | 'avgGmvHour' | 'megaAvg' | 'bauAvg' | 'topTalent'
+
 function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Stream[]; accountFilter: string; setAccountFilter: (v: string) => void }) {
+  const [sortCol, setSortCol] = useState<BrandSortCol>('totalGmv')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
   const filtered = useMemo(() =>
     accountFilter === 'All' ? streams : streams.filter(s => s.account === accountFilter)
   , [streams, accountFilter])
@@ -762,9 +829,37 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
       const talentMap: Record<string, number> = {}
       ss.forEach(s => { talentMap[s.talent] = (talentMap[s.talent] ?? 0) + s.totalGmv })
       const topTalent = Object.entries(talentMap).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'
-      return { brand, count: ss.length, tiktokGmv, shopeeGmv, totalGmv, avgGmvHour: totalHours > 0 ? totalGmv / totalHours : 0, topTalent }
-    }).sort((a, b) => b.totalGmv - a.totalGmv)
+      const megaStreams = ss.filter(s => getDayType(s.date) === 'Mega')
+      const bauStreams = ss.filter(s => getDayType(s.date) === 'BAU')
+      const megaAvg = megaStreams.length > 0 ? megaStreams.reduce((a, s) => a + s.totalGmv, 0) / megaStreams.length : 0
+      const bauAvg = bauStreams.length > 0 ? bauStreams.reduce((a, s) => a + s.totalGmv, 0) / bauStreams.length : 0
+      return { brand, count: ss.length, tiktokGmv, shopeeGmv, totalGmv, avgGmvHour: totalHours > 0 ? totalGmv / totalHours : 0, topTalent, megaAvg, bauAvg }
+    })
   }, [filtered])
+
+  const sorted = useMemo(() => {
+    return [...brandData].sort((a, b) => {
+      let av: string | number = a[sortCol]
+      let bv: string | number = b[sortCol]
+      if (typeof av === 'string') av = av.toLowerCase()
+      if (typeof bv === 'string') bv = bv.toLowerCase()
+      if (av < bv) return sortDir === 'asc' ? -1 : 1
+      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [brandData, sortCol, sortDir])
+
+  const toggleSort = (col: BrandSortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('desc') }
+  }
+
+  const col = (col: BrandSortCol, label: string) => (
+    <th style={{ ...thStyle, cursor: 'pointer', color: sortCol === col ? ACCENT : TEXT_SEC, userSelect: 'none' } as React.CSSProperties}
+      onClick={() => toggleSort(col)}>
+      {label}{sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
+    </th>
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -779,19 +874,42 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
         ))}
       </div>
       <div style={cardStyle}>
-        <SectionLabel>Brand Rankings</SectionLabel>
-        <Table
-          headers={['Brand', 'Streams', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Avg GMV/Hr', 'Top Streamer']}
-          rows={brandData.map(b => [
-            b.brand,
-            b.count,
-            b.tiktokGmv > 0 ? fmt(b.tiktokGmv) : '—',
-            b.shopeeGmv > 0 ? fmt(b.shopeeGmv) : '—',
-            fmt(b.totalGmv),
-            fmt(b.avgGmvHour),
-            b.topTalent,
-          ])}
-        />
+        <SectionLabel>Brand Rankings — click column headers to sort</SectionLabel>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr>
+                {col('brand', 'Brand')}
+                {col('count', 'Streams')}
+                {col('tiktokGmv', 'TikTok GMV')}
+                {col('shopeeGmv', 'Shopee GMV')}
+                {col('totalGmv', 'Total GMV')}
+                {col('avgGmvHour', 'Avg GMV/Hr')}
+                {col('megaAvg', '🔥 Mega Avg')}
+                {col('bauAvg', '📅 BAU Avg')}
+                {col('topTalent', 'Top Streamer')}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((b, ri) => (
+                <tr key={b.brand} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#222222')}
+                  onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
+                >
+                  <td style={tdStyle}>{b.brand}</td>
+                  <td style={tdStyle}>{b.count}</td>
+                  <td style={tdStyle}>{b.tiktokGmv > 0 ? fmt(b.tiktokGmv) : '—'}</td>
+                  <td style={tdStyle}>{b.shopeeGmv > 0 ? fmt(b.shopeeGmv) : '—'}</td>
+                  <td style={tdStyle}>{fmt(b.totalGmv)}</td>
+                  <td style={tdStyle}>{fmt(b.avgGmvHour)}</td>
+                  <td style={{ ...tdStyle, color: b.megaAvg > 0 ? '#F59E0B' : TEXT_SEC }}>{b.megaAvg > 0 ? fmt(b.megaAvg) : '—'}</td>
+                  <td style={tdStyle}>{b.bauAvg > 0 ? fmt(b.bauAvg) : '—'}</td>
+                  <td style={tdStyle}>{b.topTalent}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -800,13 +918,19 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
 // ─── Timeslots ────────────────────────────────────────────────────────────────
 
 function TimeslotsPage({ streams }: { streams: Stream[] }) {
+  const [dayFilter, setDayFilter] = useState<'All' | 'Mega' | 'BAU'>('All')
+
+  const filteredStreams = useMemo(() =>
+    dayFilter === 'All' ? streams : streams.filter(s => getDayType(s.date) === dayFilter)
+  , [streams, dayFilter])
+
   const heatmap = useMemo(() => {
     const cells: Record<string, Record<string, number[]>> = {}
     DAY_ORDER.forEach(d => {
       cells[d] = {}
       TIME_BUCKETS.forEach(b => { cells[d][b] = [] })
     })
-    streams.forEach(s => {
+    filteredStreams.forEach(s => {
       const bucket = getBucket(s.startHour)
       if (!bucket) return
       const day = s.dayOfWeek
@@ -814,7 +938,7 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
       cells[day][bucket].push(s.totalGmv)
     })
     return cells
-  }, [streams])
+  }, [filteredStreams])
 
   const allAvgs = DAY_ORDER.flatMap(d =>
     TIME_BUCKETS.map(b => {
@@ -828,7 +952,7 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
   const bucketSummary = useMemo(() => {
     const m: Record<string, { gmvs: number[]; count: number }> = {}
     TIME_BUCKETS.forEach(b => { m[b] = { gmvs: [], count: 0 } })
-    streams.forEach(s => {
+    filteredStreams.forEach(s => {
       const b = getBucket(s.startHour)
       if (b) { m[b].gmvs.push(s.totalGmv); m[b].count++ }
     })
@@ -837,12 +961,24 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
       count: m[b].count,
       avg: m[b].count > 0 ? m[b].gmvs.reduce((a, v) => a + v, 0) / m[b].count : 0,
     })).sort((a, b2) => b2.avg - a.avg)
-  }, [streams])
+  }, [filteredStreams])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={cardStyle}>
-        <SectionLabel>Avg GMV Heatmap by Day &amp; Time</SectionLabel>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>Avg GMV Heatmap by Day &amp; Time</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['All', 'Mega', 'BAU'] as const).map(f => (
+              <button key={f} onClick={() => setDayFilter(f)} style={{
+                padding: '3px 12px', borderRadius: 4, fontSize: '0.72rem', cursor: 'pointer',
+                border: `1px solid ${dayFilter === f ? (f === 'Mega' ? '#F59E0B' : ACCENT) : BORDER}`,
+                background: dayFilter === f ? (f === 'Mega' ? 'rgba(245,158,11,0.12)' : 'rgba(200,245,74,0.1)') : 'transparent',
+                color: dayFilter === f ? (f === 'Mega' ? '#F59E0B' : ACCENT) : TEXT_SEC,
+              }}>{f === 'Mega' ? '🔥 Mega' : f === 'BAU' ? '📅 BAU' : 'All Days'}</button>
+            ))}
+          </div>
+        </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 500 }}>
             <thead>
