@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, LineChart, Line, ComposedChart,
+  PieChart, Pie, Cell, Legend, ComposedChart, Line,
 } from 'recharts'
 import { KpiCard } from './KpiCard'
 import { StatusBadge } from './StatusBadge'
@@ -76,20 +76,35 @@ const fmtShort = (n: number) => {
   return fmt(n)
 }
 
+const fmt12 = (h: number, m = 0) => {
+  const period = h >= 12 ? 'pm' : 'am'
+  const hour = h % 12 === 0 ? 12 : h % 12
+  return m === 0 ? `${hour}${period}` : `${hour}:${String(m).padStart(2, '0')}${period}`
+}
+
 type Page = 'overview' | 'streamers' | 'brands' | 'timeslots' | 'ask' | 'planning'
 
 const STATUS_OPTIONS = ['All', 'Paid', 'Invoice Sent', 'Invoice Pending', 'Scheduled', 'Cancelled', 'Paid to Host, Pending Payment From Brand']
-const TIME_BUCKETS = ['12–14', '14–16', '16–18', '18–20', '20–22', '22–00']
+const TIME_BUCKETS = ['12pm–2pm', '2pm–4pm', '4pm–6pm', '6pm–8pm', '8pm–10pm', '10pm–12am']
 const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function getBucket(hour: number): string | null {
-  if (hour >= 12 && hour < 14) return '12–14'
-  if (hour >= 14 && hour < 16) return '14–16'
-  if (hour >= 16 && hour < 18) return '16–18'
-  if (hour >= 18 && hour < 20) return '18–20'
-  if (hour >= 20 && hour < 22) return '20–22'
-  if (hour >= 22 || hour === 0) return '22–00'
+  if (hour >= 12 && hour < 14) return '12pm–2pm'
+  if (hour >= 14 && hour < 16) return '2pm–4pm'
+  if (hour >= 16 && hour < 18) return '4pm–6pm'
+  if (hour >= 18 && hour < 20) return '6pm–8pm'
+  if (hour >= 20 && hour < 22) return '8pm–10pm'
+  if (hour >= 22 || hour === 0) return '10pm–12am'
   return null
+}
+
+function heatColor(ratio: number): string {
+  // interpolate red (#F87171) → green (#4ADE80)
+  if (ratio <= 0) return 'transparent'
+  const r = Math.round(248 + (74 - 248) * ratio)
+  const g = Math.round(113 + (222 - 113) * ratio)
+  const b = Math.round(113 + (128 - 113) * ratio)
+  return `rgb(${r},${g},${b})`
 }
 
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number; name: string; color: string }[]; label?: string }) => {
@@ -107,6 +122,119 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
+// ─── Floating Chat ────────────────────────────────────────────────────────────
+
+function FloatingChat({ streams }: { streams: Stream[] }) {
+  const [open, setOpen] = useState(false)
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState('')
+  const [streaming, setStreaming] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const ask = async () => {
+    if (!question.trim() || streaming) return
+    setAnswer('')
+    setStreaming(true)
+    try {
+      const res = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, streams }),
+      })
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        setAnswer(a => a + decoder.decode(value))
+      }
+    } finally {
+      setStreaming(false)
+    }
+  }
+
+  return (
+    <>
+      {/* Toggle button */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Ask Claude"
+        style={{
+          position: 'fixed', bottom: 28, right: 28, zIndex: 200,
+          width: 48, height: 48, borderRadius: '50%',
+          background: ACCENT, color: '#0A0A0A',
+          border: 'none', cursor: 'pointer',
+          fontSize: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          transition: 'transform 0.15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.08)')}
+        onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+      >
+        {open ? '✕' : '✦'}
+      </button>
+
+      {/* Panel */}
+      {open && (
+        <div style={{
+          position: 'fixed', bottom: 88, right: 28, zIndex: 200,
+          width: 380, maxHeight: '70vh',
+          background: SURFACE, border: `1px solid ${BORDER}`,
+          borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: TEXT_PRI }}>Ask Claude</div>
+            <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>{streams.length} streams</div>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {answer && (
+              <div style={{ fontSize: '0.8rem', color: TEXT_PRI, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                {answer}
+                {streaming && <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>}
+              </div>
+            )}
+            {streaming && !answer && (
+              <div style={{ fontSize: '0.8rem', color: TEXT_SEC }}>
+                Thinking<span className="cursor-blink" style={{ color: ACCENT }}>▋</span>
+              </div>
+            )}
+          </div>
+          <div style={{ padding: '10px 14px', borderTop: `1px solid ${BORDER}`, display: 'flex', gap: 8 }}>
+            <textarea
+              ref={textareaRef}
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask() } }}
+              placeholder="Ask anything..."
+              rows={2}
+              style={{
+                flex: 1, background: SURFACE_RAISED, border: `1px solid ${BORDER}`,
+                borderRadius: 6, padding: '8px 10px', color: TEXT_PRI,
+                fontSize: '0.8rem', resize: 'none', outline: 'none', fontFamily: 'inherit',
+              }}
+            />
+            <button
+              onClick={ask}
+              disabled={streaming || !question.trim()}
+              style={{
+                padding: '0 14px', background: ACCENT, color: '#0A0A0A',
+                border: 'none', borderRadius: 6, fontWeight: 700, fontSize: '0.8rem',
+                cursor: streaming || !question.trim() ? 'not-allowed' : 'pointer',
+                opacity: streaming || !question.trim() ? 0.5 : 1, alignSelf: 'stretch',
+              }}
+            >
+              {streaming ? '...' : '→'}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
   const [allStreams, setAllStreams] = useState<Stream[]>([])
   const [loading, setLoading] = useState(true)
@@ -118,6 +246,7 @@ export default function Dashboard() {
   const [selectedStatus, setSelectedStatus] = useState<string>('All')
   const [selectedMonth, setSelectedMonth] = useState<string>('All')
   const [selectedPlatform, setSelectedPlatform] = useState<string>('All')
+  const [selectedBrand, setSelectedBrand] = useState<string>('All')
 
   const [isDark, setIsDark] = useState(true)
   const [expandedTalent, setExpandedTalent] = useState<string | null>(null)
@@ -157,6 +286,12 @@ export default function Dashboard() {
     return ['All', ...Array.from(set).sort((a, b) => new Date(a) > new Date(b) ? 1 : -1)]
   }, [allStreams])
 
+  const brands = useMemo(() => {
+    const set = new Set<string>()
+    allStreams.forEach(s => { if (s.brand) set.add(s.brand) })
+    return ['All', ...Array.from(set).sort()]
+  }, [allStreams])
+
   const filtered = useMemo(() => {
     return allStreams.filter(s => {
       if (selectedStatus !== 'All' && s.status !== selectedStatus) return false
@@ -169,9 +304,10 @@ export default function Dashboard() {
         const p = s.platform ?? ''
         if (!p.toLowerCase().includes(selectedPlatform.toLowerCase())) return false
       }
+      if (selectedBrand !== 'All' && s.brand !== selectedBrand) return false
       return true
     })
-  }, [allStreams, selectedStatus, selectedMonth, selectedPlatform])
+  }, [allStreams, selectedStatus, selectedMonth, selectedPlatform, selectedBrand])
 
   const askClaude = async () => {
     if (!question.trim() || streaming) return
@@ -205,6 +341,22 @@ export default function Dashboard() {
   if (error) return (
     <div style={{ ...themeVars, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#F87171', background: 'var(--ds-bg)' }}>
       {error}
+    </div>
+  )
+
+  const selectStyle: React.CSSProperties = {
+    background: SURFACE_RAISED, border: `1px solid ${BORDER}`, color: TEXT_PRI,
+    padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.7rem', color: TEXT_SEC, whiteSpace: 'nowrap',
+  }
+
+  const filterGroup = (label: string, el: React.ReactNode) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={labelStyle}>{label}</span>
+      {el}
     </div>
   )
 
@@ -249,32 +401,29 @@ export default function Dashboard() {
       <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
         {/* Top bar */}
         <div style={{
-          padding: '16px 32px', borderBottom: `1px solid ${BORDER}`, background: SURFACE,
-          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 10,
+          padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, background: SURFACE,
+          display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 10,
         }}>
-          {/* Status */}
-          <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} style={{
-            background: SURFACE_RAISED, border: `1px solid ${BORDER}`, color: TEXT_PRI,
-            padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
-          }}>
-            {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-          </select>
-
-          {/* Month */}
-          <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={{
-            background: SURFACE_RAISED, border: `1px solid ${BORDER}`, color: TEXT_PRI,
-            padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
-          }}>
-            {months.map(m => <option key={m}>{m}</option>)}
-          </select>
-
-          {/* Platform */}
-          <select value={selectedPlatform} onChange={e => setSelectedPlatform(e.target.value)} style={{
-            background: SURFACE_RAISED, border: `1px solid ${BORDER}`, color: TEXT_PRI,
-            padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
-          }}>
-            {['All', 'TikTok', 'Shopee'].map(p => <option key={p}>{p}</option>)}
-          </select>
+          {filterGroup('Status:', (
+            <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} style={selectStyle}>
+              {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
+            </select>
+          ))}
+          {filterGroup('Month:', (
+            <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={selectStyle}>
+              {months.map(m => <option key={m}>{m}</option>)}
+            </select>
+          ))}
+          {filterGroup('Platform:', (
+            <select value={selectedPlatform} onChange={e => setSelectedPlatform(e.target.value)} style={selectStyle}>
+              {['All', 'TikTok', 'Shopee'].map(p => <option key={p}>{p}</option>)}
+            </select>
+          ))}
+          {filterGroup('Brand:', (
+            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={selectStyle}>
+              {brands.map(b => <option key={b}>{b}</option>)}
+            </select>
+          ))}
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
             {cachedAt && (
@@ -285,21 +434,13 @@ export default function Dashboard() {
             <button onClick={() => setIsDark(d => !d)} style={{
               padding: '5px 12px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
               border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
-              transition: 'border-color 0.1s',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = isDark ? '#C8F54A' : '#4E7200')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = '')}
-            >
+            }}>
               {isDark ? '☀ Light' : '☾ Dark'}
             </button>
             <button onClick={() => load(true)} disabled={refreshing} style={{
               padding: '5px 14px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
               border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
-              transition: 'border-color 0.1s',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = ACCENT)}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = BORDER)}
-            >
+            }}>
               {refreshing ? 'Refreshing...' : '↻ Refresh'}
             </button>
           </div>
@@ -311,7 +452,7 @@ export default function Dashboard() {
           {page === 'streamers' && <StreamersPage streams={filtered} expanded={expandedTalent} setExpanded={setExpandedTalent} />}
           {page === 'brands' && <BrandsPage streams={filtered} accountFilter={brandAccountFilter} setAccountFilter={setBrandAccountFilter} />}
           {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
-          {page === 'planning' && <PlanningPage allStreams={allStreams} />}
+          {page === 'planning' && <PlanningPage allStreams={allStreams} selectedBrand={selectedBrand} />}
           {page === 'ask' && (
             <AskPage
               streams={filtered}
@@ -325,6 +466,8 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      <FloatingChat streams={filtered} />
     </div>
   )
 }
@@ -372,13 +515,14 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
     { name: 'Shopee', value: totalShopee },
   ].filter(d => d.value > 0)
 
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
   const recent = [...streams]
+    .filter(s => new Date(s.date) >= sevenDaysAgo)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 20)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* KPIs */}
       <div style={{ display: 'flex', gap: 16 }}>
         <KpiCard label="Total GMV" value={fmtShort(totalGmv)} />
         <KpiCard label="Total Streams" value={String(totalStreams)} />
@@ -390,7 +534,6 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
         />
       </div>
 
-      {/* Charts */}
       <div style={{ display: 'flex', gap: 16 }}>
         <div style={{ flex: 2, ...cardStyle }}>
           <SectionLabel>Monthly Total GMV &amp; GMV / Hour</SectionLabel>
@@ -433,23 +576,26 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
         </div>
       </div>
 
-      {/* Recent table */}
       <div style={cardStyle}>
-        <SectionLabel>Recent Streams</SectionLabel>
-        <Table
-          headers={['Date', 'Day', 'Talent', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Status']}
-          rows={recent.map(s => [
-            new Date(s.date).toLocaleDateString('en-SG'),
-            s.dayOfWeek,
-            s.talent,
-            s.brand ?? '—',
-            s.platform ?? '—',
-            s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—',
-            s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—',
-            s.totalGmv > 0 ? fmt(s.totalGmv) : '—',
-            <StatusBadge key="s" status={s.status} />,
-          ])}
-        />
+        <SectionLabel>Recent Streams — Last 7 Days ({recent.length})</SectionLabel>
+        {recent.length === 0 ? (
+          <div style={{ color: TEXT_SEC, fontSize: '0.8rem', padding: '12px 0' }}>No streams in the last 7 days with current filters.</div>
+        ) : (
+          <Table
+            headers={['Date', 'Day', 'Talent', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Status']}
+            rows={recent.map(s => [
+              new Date(s.date).toLocaleDateString('en-SG'),
+              s.dayOfWeek,
+              s.talent,
+              s.brand ?? '—',
+              s.platform ?? '—',
+              s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—',
+              s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—',
+              s.totalGmv > 0 ? fmt(s.totalGmv) : '—',
+              <StatusBadge key="s" status={s.status} />,
+            ])}
+          />
+        )}
       </div>
     </div>
   )
@@ -457,7 +603,13 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
 
 // ─── Streamers ────────────────────────────────────────────────────────────────
 
+type SortCol = 'talent' | 'count' | 'totalGmv' | 'avgGmvStream' | 'avgGmvHour' | 'topBrand'
+type SortDir = 'asc' | 'desc'
+
 function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; expanded: string | null; setExpanded: (v: string | null) => void }) {
+  const [sortCol, setSortCol] = useState<SortCol>('totalGmv')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
+
   const talentData = useMemo(() => {
     const m: Record<string, { streams: Stream[] }> = {}
     streams.forEach(s => {
@@ -479,10 +631,35 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
         topBrand,
         streams: ss,
       }
-    }).sort((a, b) => b.totalGmv - a.totalGmv)
+    })
   }, [streams])
 
-  const chartData = talentData.map(t => ({ name: t.talent, gmv: t.totalGmv }))
+  const sorted = useMemo(() => {
+    return [...talentData].sort((a, b) => {
+      let av: string | number = a[sortCol]
+      let bv: string | number = b[sortCol]
+      if (typeof av === 'string') av = av.toLowerCase()
+      if (typeof bv === 'string') bv = bv.toLowerCase()
+      if (av < bv) return sortDir === 'asc' ? -1 : 1
+      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [talentData, sortCol, sortDir])
+
+  const toggleSort = (col: SortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('desc') }
+  }
+
+  const sortArrow = (col: SortCol) => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+
+  const chartData = sorted.map(t => ({ name: t.talent, gmv: t.totalGmv }))
+
+  const colStyle = (col: SortCol): React.CSSProperties => ({
+    ...thStyle, cursor: 'pointer',
+    color: sortCol === col ? ACCENT : TEXT_SEC,
+    userSelect: 'none',
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -499,43 +676,65 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
       </div>
 
       <div style={cardStyle}>
-        <SectionLabel>Streamer Rankings</SectionLabel>
-        <Table
-          headers={['Talent', 'Streams', 'Total GMV', 'Avg/Stream', 'Avg GMV/Hr', 'Top Brand', '']}
-          rows={talentData.map(t => [
-            <button key={t.talent} onClick={() => setExpanded(expanded === t.talent ? null : t.talent)}
-              style={{ background: 'none', border: 'none', color: ACCENT, cursor: 'pointer', fontSize: '0.875rem', textAlign: 'left', padding: 0 }}>
-              {t.talent}
-            </button>,
-            t.count,
-            fmt(t.totalGmv),
-            fmt(t.avgGmvStream),
-            fmt(t.avgGmvHour),
-            t.topBrand,
-            <span key="x" style={{ color: TEXT_SEC, fontSize: '0.75rem' }}>{expanded === t.talent ? '▲' : '▼'}</span>,
-          ])}
-          expandedRow={expanded}
-          expandedContent={talentData.reduce((acc, t) => {
-            acc[t.talent] = (
-              <Table
-                headers={['Date', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Hours', 'Status']}
-                rows={[...t.streams].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(s => [
-                  new Date(s.date).toLocaleDateString('en-SG'),
-                  s.brand ?? '—',
-                  s.platform ?? '—',
-                  s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—',
-                  s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—',
-                  fmt(s.totalGmv),
-                  s.hours.toFixed(1),
-                  <StatusBadge key="s" status={s.status} />,
-                ])}
-                compact
-              />
-            )
-            return acc
-          }, {} as Record<string, React.ReactNode>)}
-          expandKey={0}
-        />
+        <SectionLabel>Streamer Rankings — click column headers to sort</SectionLabel>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={colStyle('talent')} onClick={() => toggleSort('talent')}>Talent{sortArrow('talent')}</th>
+                <th style={colStyle('count')} onClick={() => toggleSort('count')}>Streams{sortArrow('count')}</th>
+                <th style={colStyle('totalGmv')} onClick={() => toggleSort('totalGmv')}>Total GMV{sortArrow('totalGmv')}</th>
+                <th style={colStyle('avgGmvStream')} onClick={() => toggleSort('avgGmvStream')}>Avg/Stream{sortArrow('avgGmvStream')}</th>
+                <th style={colStyle('avgGmvHour')} onClick={() => toggleSort('avgGmvHour')}>Avg GMV/Hr{sortArrow('avgGmvHour')}</th>
+                <th style={colStyle('topBrand')} onClick={() => toggleSort('topBrand')}>Top Brand{sortArrow('topBrand')}</th>
+                <th style={thStyle}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((t, ri) => (
+                <>
+                  <tr key={t.talent} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#222222')}
+                    onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
+                  >
+                    <td style={tdStyle}>
+                      <button onClick={() => setExpanded(expanded === t.talent ? null : t.talent)}
+                        style={{ background: 'none', border: 'none', color: ACCENT, cursor: 'pointer', fontSize: '0.875rem', textAlign: 'left', padding: 0 }}>
+                        {t.talent}
+                      </button>
+                    </td>
+                    <td style={tdStyle}>{t.count}</td>
+                    <td style={tdStyle}>{fmt(t.totalGmv)}</td>
+                    <td style={tdStyle}>{fmt(t.avgGmvStream)}</td>
+                    <td style={tdStyle}>{fmt(t.avgGmvHour)}</td>
+                    <td style={tdStyle}>{t.topBrand}</td>
+                    <td style={tdStyle}><span style={{ color: TEXT_SEC, fontSize: '0.75rem' }}>{expanded === t.talent ? '▲' : '▼'}</span></td>
+                  </tr>
+                  {expanded === t.talent && (
+                    <tr key={`${t.talent}-exp`}>
+                      <td colSpan={7} style={{ padding: '0 0 0 32px', background: '#0D0D0D' }}>
+                        <Table
+                          headers={['Date', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Hours', 'Status']}
+                          rows={[...t.streams].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(s => [
+                            new Date(s.date).toLocaleDateString('en-SG'),
+                            s.brand ?? '—',
+                            s.platform ?? '—',
+                            s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—',
+                            s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—',
+                            fmt(s.totalGmv),
+                            s.hours.toFixed(1),
+                            <StatusBadge key="s" status={s.status} />,
+                          ])}
+                          compact
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
@@ -624,6 +823,7 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
     })
   ).filter(v => v > 0)
   const maxAvg = Math.max(...allAvgs, 1)
+  const minAvg = Math.min(...allAvgs, 0)
 
   const bucketSummary = useMemo(() => {
     const m: Record<string, { gmvs: number[]; count: number }> = {}
@@ -642,7 +842,7 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={cardStyle}>
-        <SectionLabel>Avg GMV Heatmap by Day & Time</SectionLabel>
+        <SectionLabel>Avg GMV Heatmap by Day &amp; Time</SectionLabel>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 500 }}>
             <thead>
@@ -658,16 +858,18 @@ function TimeslotsPage({ streams }: { streams: Stream[] }) {
                   {TIME_BUCKETS.map(bucket => {
                     const vals = heatmap[day][bucket]
                     const avg = vals.length > 0 ? vals.reduce((a, v) => a + v, 0) / vals.length : 0
-                    const opacity = avg > 0 ? 0.1 + (avg / maxAvg) * 0.9 : 0
+                    const ratio = avg > 0 ? (avg - minAvg) / (maxAvg - minAvg) : 0
+                    const bg = heatColor(ratio)
+                    const textDark = ratio > 0.5
                     return (
                       <td key={bucket} style={{
                         ...tdStyle, textAlign: 'center',
-                        background: avg > 0 ? `rgba(200,245,74,${opacity})` : 'transparent',
-                        color: avg > 0 ? (opacity > 0.5 ? '#0A0A0A' : ACCENT) : TEXT_SEC,
+                        background: bg,
+                        color: avg > 0 ? (textDark ? '#0A0A0A' : '#F0F0F0') : TEXT_SEC,
                         fontSize: '0.7rem', fontWeight: avg > 0 ? 600 : 400,
                       }}>
                         {avg > 0 ? fmtShort(avg) : '—'}
-                        {vals.length > 0 && <div style={{ fontSize: '0.65rem', opacity: 0.6 }}>{vals.length}x</div>}
+                        {vals.length > 0 && <div style={{ fontSize: '0.65rem', opacity: 0.7 }}>{vals.length}x</div>}
                       </td>
                     )
                   })}
@@ -726,15 +928,18 @@ function isTBC(s: Stream): boolean {
   )
 }
 
-function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
+interface ChatMsg { role: 'user' | 'assistant'; text: string }
+
+function PlanningPage({ allStreams, selectedBrand }: { allStreams: Stream[]; selectedBrand: string }) {
   const planned = useMemo(() => {
     const now = new Date()
     return allStreams.filter(s => {
       if (!isTBC(s)) return false
+      if (selectedBrand !== 'All' && s.brand !== selectedBrand) return false
       const d = new Date(s.date)
       return d >= now
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }, [allStreams])
+  }, [allStreams, selectedBrand])
 
   const historical = useMemo(() =>
     allStreams.filter(s => ['Paid', 'Invoice Sent', 'Invoice Pending'].includes(s.status ?? ''))
@@ -766,11 +971,18 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
   const [analysed, setAnalysed] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
 
+  // Follow-up chat
+  const [followUps, setFollowUps] = useState<ChatMsg[]>([])
+  const [followInput, setFollowInput] = useState('')
+  const [followStreaming, setFollowStreaming] = useState(false)
+  const followEndRef = useRef<HTMLDivElement>(null)
+
   const runAnalysis = useCallback(async () => {
     if (analysing || planned.length === 0) return
     setAnalysis('')
     setAnalysing(true)
     setAnalysed(false)
+    setFollowUps([])
     try {
       const res = await fetch('/api/plan-analysis', {
         method: 'POST',
@@ -790,6 +1002,39 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
     }
   }, [planned, historical, analysing])
 
+  const askFollowUp = async () => {
+    if (!followInput.trim() || followStreaming || !analysis) return
+    const userMsg = followInput.trim()
+    setFollowInput('')
+    const userEntry: ChatMsg = { role: 'user', text: userMsg }
+    const newMsgs = [...followUps, userEntry]
+    setFollowUps(newMsgs)
+    setFollowStreaming(true)
+
+    const contextQ = `You previously produced this planning analysis:\n\n${analysis}\n\nFollow-up question: ${userMsg}`
+    try {
+      const res = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: contextQ, streams: [...historical, ...planned] }),
+      })
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let reply = ''
+      const assistantEntry: ChatMsg = { role: 'assistant', text: '' }
+      setFollowUps([...newMsgs, assistantEntry])
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        reply += decoder.decode(value)
+        setFollowUps([...newMsgs, { role: 'assistant', text: reply }])
+      }
+    } finally {
+      setFollowStreaming(false)
+      setTimeout(() => followEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
+  }
+
   const months = useMemo(() => {
     const s = new Set<string>()
     planned.forEach(p => {
@@ -799,11 +1044,11 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
     return Array.from(s).join(', ')
   }, [planned])
 
-  // Parse markdown-ish analysis into sections
   const sections = useMemo(() => {
     if (!analysis) return []
-    return analysis.split(/\n##\s+/).filter(Boolean).map(block => {
-      const lines = block.split('\n')
+    return analysis.split(/\n?##\s+/).filter(Boolean).map(block => {
+      const stripped = block.replace(/^##\s+/, '')
+      const lines = stripped.split('\n')
       const title = lines[0].trim()
       const body = lines.slice(1).join('\n').trim()
       return { title, body }
@@ -822,7 +1067,6 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: TEXT_PRI, marginBottom: 4, fontFamily: 'var(--font-space-grotesk)' }}>
@@ -840,7 +1084,6 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
         </button>
       </div>
 
-      {/* KPI row */}
       <div style={{ display: 'flex', gap: 16 }}>
         <KpiCard label="Planned Streams" value={String(planned.length)} />
         <KpiCard label="Streamers" value={String(byTalent.length)} />
@@ -848,9 +1091,7 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
         <KpiCard label="Time Slots" value={String(byTimeslot.length)} />
       </div>
 
-      {/* Tables row */}
       <div style={{ display: 'flex', gap: 16 }}>
-        {/* By streamer */}
         <div style={{ flex: 1, ...cardStyle }}>
           <SectionLabel>Streams per Streamer</SectionLabel>
           <Table
@@ -868,8 +1109,6 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
             ])}
           />
         </div>
-
-        {/* By brand */}
         <div style={{ flex: 1, ...cardStyle }}>
           <SectionLabel>Streams per Brand</SectionLabel>
           <Table
@@ -889,19 +1128,16 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
         </div>
       </div>
 
-      {/* Planned schedule table — collapsible */}
+      {/* Planned schedule — collapsible */}
       <div style={cardStyle}>
         <button
           onClick={() => setScheduleOpen(o => !o)}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-          }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
         >
           <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>
             Planned Schedule ({planned.length})
           </span>
-          <span style={{ color: TEXT_SEC, fontSize: '0.75rem', transition: 'transform 0.15s', display: 'inline-block', transform: scheduleOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+          <span style={{ color: TEXT_SEC, fontSize: '0.75rem', display: 'inline-block', transform: scheduleOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>▼</span>
         </button>
         {scheduleOpen && (
           <div style={{ marginTop: 16 }}>
@@ -910,7 +1146,7 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
               rows={planned.map(s => [
                 new Date(s.date).toLocaleDateString('en-SG'),
                 s.dayOfWeek,
-                `${String(s.startHour).padStart(2,'0')}:${String(s.startMinute).padStart(2,'0')}–${s.endIsNextDay ? '00:00' : `${String(s.endHour).padStart(2,'0')}:${String(s.endMinute).padStart(2,'0')}`}`,
+                `${fmt12(s.startHour, s.startMinute)}–${s.endIsNextDay ? '12am' : fmt12(s.endHour, s.endMinute)}`,
                 s.talent,
                 s.brand ?? '—',
                 s.platform ?? '—',
@@ -937,11 +1173,11 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
           )}
 
           {sections.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'row', gap: 16, overflowX: 'auto', paddingBottom: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
               {sections.map((s, i) => (
                 <div key={i} style={{
                   ...cardStyle,
-                  minWidth: 280, flex: '1 1 280px',
+                  minWidth: 260, maxWidth: 340, flexShrink: 0,
                   borderLeft: `3px solid ${
                     s.title.toLowerCase().includes('risk') || s.title.toLowerCase().includes('flag')
                       ? '#F87171'
@@ -950,10 +1186,10 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
                       : '#60A5FA'
                   }`,
                 }}>
-                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 10 }}>
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: ACCENT, marginBottom: 10, fontWeight: 700 }}>
                     {s.title}
                   </div>
-                  <MdText text={s.body} style={{ fontSize: '0.85rem', color: TEXT_SEC, lineHeight: 1.8 }} />
+                  <MdText text={s.body} style={{ fontSize: '0.82rem', color: TEXT_SEC, lineHeight: 1.8 }} />
                   {i === sections.length - 1 && analysing && (
                     <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>
                   )}
@@ -966,6 +1202,67 @@ function PlanningPage({ allStreams }: { allStreams: Stream[] }) {
               {analysing && <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>}
             </div>
           ) : null}
+
+          {/* Follow-up chat */}
+          {analysed && (
+            <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>
+                Follow-up Questions
+              </div>
+
+              {followUps.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 300, overflowY: 'auto' }}>
+                  {followUps.map((msg, i) => (
+                    <div key={i} style={{
+                      padding: '8px 12px', borderRadius: 6,
+                      background: msg.role === 'user' ? SURFACE_RAISED : 'transparent',
+                      border: msg.role === 'assistant' ? `1px solid ${BORDER}` : 'none',
+                      fontSize: '0.82rem', lineHeight: 1.7,
+                    }}>
+                      {msg.role === 'user' ? (
+                        <span style={{ color: ACCENT }}>{msg.text}</span>
+                      ) : (
+                        <>
+                          <MdText text={msg.text} style={{ color: TEXT_PRI }} />
+                          {i === followUps.length - 1 && followStreaming && (
+                            <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={followEndRef} />
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={followInput}
+                  onChange={e => setFollowInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); askFollowUp() } }}
+                  placeholder="Ask a follow-up question about this analysis..."
+                  style={{
+                    flex: 1, background: SURFACE_RAISED, border: `1px solid ${BORDER}`,
+                    borderRadius: 6, padding: '8px 12px', color: TEXT_PRI,
+                    fontSize: '0.82rem', outline: 'none', fontFamily: 'inherit',
+                  }}
+                  disabled={followStreaming}
+                />
+                <button
+                  onClick={askFollowUp}
+                  disabled={followStreaming || !followInput.trim()}
+                  style={{
+                    padding: '8px 16px', background: ACCENT, color: '#0A0A0A',
+                    border: 'none', borderRadius: 6, fontWeight: 700, fontSize: '0.8rem',
+                    cursor: followStreaming || !followInput.trim() ? 'not-allowed' : 'pointer',
+                    opacity: followStreaming || !followInput.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {followStreaming ? '...' : '→'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1089,14 +1386,11 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 function Table({
-  headers, rows, compact = false, expandedRow, expandedContent, expandKey,
+  headers, rows, compact = false,
 }: {
   headers: string[]
   rows: (React.ReactNode | string | number)[][]
   compact?: boolean
-  expandedRow?: string | null
-  expandedContent?: Record<string, React.ReactNode>
-  expandKey?: number
 }) {
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -1107,31 +1401,18 @@ function Table({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, ri) => {
-            const key = expandKey !== undefined ? String(row[expandKey]) : String(ri)
-            const isExpanded = expandedRow !== undefined && expandedRow === key
-            return (
-              <>
-                <tr key={ri} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#222222')}
-                  onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
-                >
-                  {row.map((cell, ci) => (
-                    <td key={ci} style={compact ? { ...tdStyle, padding: '6px 10px', fontSize: '0.75rem' } : tdStyle}>
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-                {isExpanded && expandedContent && expandedContent[key] && (
-                  <tr key={`${ri}-expanded`}>
-                    <td colSpan={headers.length} style={{ padding: '0 0 0 32px', background: '#0D0D0D' }}>
-                      {expandedContent[key]}
-                    </td>
-                  </tr>
-                )}
-              </>
-            )
-          })}
+          {rows.map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#222222')}
+              onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
+            >
+              {row.map((cell, ci) => (
+                <td key={ci} style={compact ? { ...tdStyle, padding: '6px 10px', fontSize: '0.75rem' } : tdStyle}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
