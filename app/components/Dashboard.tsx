@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, ComposedChart, Line,
@@ -133,9 +133,25 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
+// ─── Mobile context ──────────────────────────────────────────────────────────
+
+const MobileCtx = createContext(false)
+const useMobile = () => useContext(MobileCtx)
+
+function useWindowWidth() {
+  const [w, setW] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200)
+  useEffect(() => {
+    const handler = () => setW(window.innerWidth)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return w
+}
+
 // ─── Floating Chat ────────────────────────────────────────────────────────────
 
 function FloatingChat({ streams }: { streams: Stream[] }) {
+  const isMobile = useMobile()
   const [open, setOpen] = useState(false)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
@@ -164,49 +180,45 @@ function FloatingChat({ streams }: { streams: Stream[] }) {
     }
   }
 
+  // On mobile the button sits above the bottom nav bar
+  const btnBottom = isMobile ? 76 : 28
+
+  const panelStyle: React.CSSProperties = isMobile
+    ? { position: 'fixed', inset: 0, bottom: 56, zIndex: 300, background: SURFACE, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+    : { position: 'fixed', bottom: 88, right: 28, zIndex: 300, width: 380, maxHeight: '70vh', background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+
   return (
     <>
-      {/* Toggle button */}
       <button
         onClick={() => setOpen(o => !o)}
         title="Ask Claude"
         style={{
-          position: 'fixed', bottom: 28, right: 28, zIndex: 200,
+          position: 'fixed', bottom: btnBottom, right: 20, zIndex: 300,
           width: 48, height: 48, borderRadius: '50%',
           background: ACCENT, color: '#0A0A0A',
           border: 'none', cursor: 'pointer',
           fontSize: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          transition: 'transform 0.15s',
         }}
-        onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.08)')}
-        onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
       >
         {open ? '✕' : '✦'}
       </button>
 
-      {/* Panel */}
       {open && (
-        <div style={{
-          position: 'fixed', bottom: 88, right: 28, zIndex: 200,
-          width: 380, maxHeight: '70vh',
-          background: SURFACE, border: `1px solid ${BORDER}`,
-          borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        }}>
+        <div style={panelStyle}>
           <div style={{ padding: '14px 16px', borderBottom: `1px solid ${BORDER}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: TEXT_PRI }}>Ask Claude</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: TEXT_PRI }}>Ask Claude</div>
             <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>{streams.length} streams</div>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {answer && (
-              <div style={{ fontSize: '0.8rem', color: TEXT_PRI, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+              <div style={{ fontSize: '0.85rem', color: TEXT_PRI, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                 {answer}
                 {streaming && <span className="cursor-blink" style={{ color: ACCENT }}>▋</span>}
               </div>
             )}
             {streaming && !answer && (
-              <div style={{ fontSize: '0.8rem', color: TEXT_SEC }}>
+              <div style={{ fontSize: '0.85rem', color: TEXT_SEC }}>
                 Thinking<span className="cursor-blink" style={{ color: ACCENT }}>▋</span>
               </div>
             )}
@@ -221,16 +233,16 @@ function FloatingChat({ streams }: { streams: Stream[] }) {
               rows={2}
               style={{
                 flex: 1, background: SURFACE_RAISED, border: `1px solid ${BORDER}`,
-                borderRadius: 6, padding: '8px 10px', color: TEXT_PRI,
-                fontSize: '0.8rem', resize: 'none', outline: 'none', fontFamily: 'inherit',
+                borderRadius: 6, padding: '10px 12px', color: TEXT_PRI,
+                fontSize: '1rem', resize: 'none', outline: 'none', fontFamily: 'inherit',
               }}
             />
             <button
               onClick={ask}
               disabled={streaming || !question.trim()}
               style={{
-                padding: '0 14px', background: ACCENT, color: '#0A0A0A',
-                border: 'none', borderRadius: 6, fontWeight: 700, fontSize: '0.8rem',
+                padding: '0 16px', background: ACCENT, color: '#0A0A0A',
+                border: 'none', borderRadius: 6, fontWeight: 700, fontSize: '0.9rem',
                 cursor: streaming || !question.trim() ? 'not-allowed' : 'pointer',
                 opacity: streaming || !question.trim() ? 0.5 : 1, alignSelf: 'stretch',
               }}
@@ -247,6 +259,9 @@ function FloatingChat({ streams }: { streams: Stream[] }) {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const width = useWindowWidth()
+  const isMobile = width < 768
+
   const [allStreams, setAllStreams] = useState<Stream[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -258,6 +273,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string>('All')
   const [selectedPlatform, setSelectedPlatform] = useState<string>('All')
   const [selectedBrand, setSelectedBrand] = useState<string>('All')
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const [isDark, setIsDark] = useState(true)
   const [expandedTalent, setExpandedTalent] = useState<string | null>(null)
@@ -345,147 +361,233 @@ export default function Dashboard() {
   const themeVars = isDark ? DARK_VARS : LIGHT_VARS
 
   if (loading) return (
-    <div style={{ ...themeVars, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: TEXT_SEC, background: 'var(--ds-bg)' }}>
+    <div style={{ ...themeVars, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: TEXT_SEC, background: 'var(--ds-bg)', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: '1.5rem', color: ACCENT }}>✦</div>
       Loading streams...
     </div>
   )
   if (error) return (
-    <div style={{ ...themeVars, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#F87171', background: 'var(--ds-bg)' }}>
+    <div style={{ ...themeVars, display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#F87171', background: 'var(--ds-bg)', padding: 24, textAlign: 'center' }}>
       {error}
     </div>
   )
 
   const selectStyle: React.CSSProperties = {
     background: SURFACE_RAISED, border: `1px solid ${BORDER}`, color: TEXT_PRI,
-    padding: '4px 8px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
+    padding: isMobile ? '7px 8px' : '4px 8px', borderRadius: 4,
+    fontSize: isMobile ? '0.875rem' : '0.75rem', cursor: 'pointer', width: '100%',
   }
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.7rem', color: TEXT_SEC, whiteSpace: 'nowrap',
+  const PAGE_ICONS: Record<Page, string> = {
+    overview: '◎', streamers: '👤', brands: '🏷', timeslots: '🕐', planning: '📋', ask: '✦',
+  }
+  const PAGE_LABELS: Record<Page, string> = {
+    overview: 'Overview', streamers: 'Streamers', brands: 'Brands',
+    timeslots: 'Timeslots', planning: 'Planning', ask: 'Ask',
   }
 
-  const filterGroup = (label: string, el: React.ReactNode) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={labelStyle}>{label}</span>
-      {el}
-    </div>
+  const activeFilters = [selectedStatus, selectedMonth, selectedPlatform, selectedBrand].filter(v => v !== 'All').length
+
+  const pageContent = (
+    <>
+      {page === 'overview' && <OverviewPage streams={filtered} />}
+      {page === 'streamers' && <StreamersPage streams={filtered} expanded={expandedTalent} setExpanded={setExpandedTalent} />}
+      {page === 'brands' && <BrandsPage streams={filtered} accountFilter={brandAccountFilter} setAccountFilter={setBrandAccountFilter} />}
+      {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
+      {page === 'planning' && <PlanningPage allStreams={allStreams} selectedBrand={selectedBrand} />}
+      {page === 'ask' && (
+        <AskPage
+          streams={filtered}
+          question={question}
+          setQuestion={setQuestion}
+          answer={answer}
+          streaming={streaming}
+          onAsk={askClaude}
+          onSuggest={setQuestion}
+        />
+      )}
+    </>
   )
 
   return (
-    <div style={{ ...themeVars, display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--ds-bg)' } as React.CSSProperties}>
-      {/* Sidebar */}
-      <aside style={{
-        width: 220, flexShrink: 0, background: SURFACE, borderRight: `1px solid ${BORDER}`,
-        display: 'flex', flexDirection: 'column', padding: '24px 0',
-      }}>
-        <div style={{ padding: '0 20px 24px', borderBottom: `1px solid ${BORDER}` }}>
-          <div style={{ fontSize: '1rem', fontWeight: 700, color: ACCENT, letterSpacing: '-0.01em', fontFamily: 'var(--font-space-grotesk)' }}>MAJORFORM</div>
-          <div style={{ fontSize: '0.7rem', color: TEXT_SEC, marginTop: 2, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Livestream Dashboard</div>
-        </div>
-        <nav style={{ padding: '16px 0', flex: 1 }}>
-          {(['overview', 'streamers', 'brands', 'timeslots', 'planning', 'ask'] as Page[]).map(p => {
-            const labels: Record<Page, string> = {
-              overview: 'Overview', streamers: 'Streamers', brands: 'Brands',
-              timeslots: 'Timeslots', planning: 'Planning', ask: 'Ask Claude',
-            }
-            const active = page === p
-            return (
-              <button key={p} onClick={() => setPage(p)} style={{
-                width: '100%', textAlign: 'left', padding: '10px 20px',
-                background: active ? SURFACE_RAISED : 'transparent',
-                borderLeft: active ? `3px solid ${ACCENT}` : '3px solid transparent',
-                color: active ? TEXT_PRI : TEXT_SEC,
-                borderTop: 'none', borderRight: 'none', borderBottom: 'none',
-                cursor: 'pointer', fontSize: '0.875rem', transition: 'all 0.1s',
-              }}>
-                {labels[p]}
-              </button>
-            )
-          })}
-        </nav>
-        <div style={{ padding: '16px 20px', borderTop: `1px solid ${BORDER}`, fontSize: '0.7rem', color: TEXT_SEC }}>
-          {filtered.length} streams shown
-        </div>
-      </aside>
+    <MobileCtx.Provider value={isMobile}>
+      <div style={{ ...themeVars, display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--ds-bg)' } as React.CSSProperties}>
 
-      {/* Main */}
-      <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {/* Top bar */}
-        <div style={{
-          padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, background: SURFACE,
-          display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 10,
-        }}>
-          {filterGroup('Status:', (
-            <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} style={selectStyle}>
-              {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-            </select>
-          ))}
-          {filterGroup('Month:', (
-            <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={selectStyle}>
-              {months.map(m => <option key={m}>{m}</option>)}
-            </select>
-          ))}
-          {filterGroup('Platform:', (
-            <select value={selectedPlatform} onChange={e => setSelectedPlatform(e.target.value)} style={selectStyle}>
-              {['All', 'TikTok', 'Shopee'].map(p => <option key={p}>{p}</option>)}
-            </select>
-          ))}
-          {filterGroup('Brand:', (
-            <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)} style={selectStyle}>
-              {brands.map(b => <option key={b}>{b}</option>)}
-            </select>
-          ))}
+        {/* ── Desktop sidebar ── */}
+        {!isMobile && (
+          <aside style={{
+            width: 220, flexShrink: 0, background: SURFACE, borderRight: `1px solid ${BORDER}`,
+            display: 'flex', flexDirection: 'column', padding: '24px 0',
+          }}>
+            <div style={{ padding: '0 20px 24px', borderBottom: `1px solid ${BORDER}` }}>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: ACCENT, letterSpacing: '-0.01em', fontFamily: 'var(--font-space-grotesk)' }}>MAJORFORM</div>
+              <div style={{ fontSize: '0.7rem', color: TEXT_SEC, marginTop: 2, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Livestream Dashboard</div>
+            </div>
+            <nav style={{ padding: '16px 0', flex: 1 }}>
+              {(['overview', 'streamers', 'brands', 'timeslots', 'planning', 'ask'] as Page[]).map(p => {
+                const active = page === p
+                return (
+                  <button key={p} onClick={() => setPage(p)} style={{
+                    width: '100%', textAlign: 'left', padding: '10px 20px',
+                    background: active ? SURFACE_RAISED : 'transparent',
+                    borderLeft: active ? `3px solid ${ACCENT}` : '3px solid transparent',
+                    color: active ? TEXT_PRI : TEXT_SEC,
+                    borderTop: 'none', borderRight: 'none', borderBottom: 'none',
+                    cursor: 'pointer', fontSize: '0.875rem', transition: 'all 0.1s',
+                  }}>
+                    {PAGE_LABELS[p]}
+                  </button>
+                )
+              })}
+            </nav>
+            <div style={{ padding: '16px 20px', borderTop: `1px solid ${BORDER}`, fontSize: '0.7rem', color: TEXT_SEC }}>
+              {filtered.length} streams shown
+            </div>
+          </aside>
+        )}
 
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-            {cachedAt && (
-              <span style={{ fontSize: '0.7rem', color: TEXT_SEC }}>
-                Synced {new Date(cachedAt).toLocaleTimeString('en-SG')}
-              </span>
-            )}
-            <button onClick={() => setIsDark(d => !d)} style={{
-              padding: '5px 12px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
-              border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
+        {/* ── Main ── */}
+        <main style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: isMobile ? 56 : 0 }}>
+
+          {/* ── Mobile header ── */}
+          {isMobile && (
+            <div style={{
+              position: 'sticky', top: 0, zIndex: 20,
+              background: SURFACE, borderBottom: `1px solid ${BORDER}`,
+              padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              {isDark ? '☀ Light' : '☾ Dark'}
-            </button>
-            <button onClick={() => load(true)} disabled={refreshing} style={{
-              padding: '5px 14px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer',
-              border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
-            }}>
-              {refreshing ? 'Refreshing...' : '↻ Refresh'}
-            </button>
-          </div>
-        </div>
-
-        {/* Page content */}
-        <div style={{ padding: 32, flex: 1 }}>
-          {page === 'overview' && <OverviewPage streams={filtered} />}
-          {page === 'streamers' && <StreamersPage streams={filtered} expanded={expandedTalent} setExpanded={setExpandedTalent} />}
-          {page === 'brands' && <BrandsPage streams={filtered} accountFilter={brandAccountFilter} setAccountFilter={setBrandAccountFilter} />}
-          {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
-          {page === 'planning' && <PlanningPage allStreams={allStreams} selectedBrand={selectedBrand} />}
-          {page === 'ask' && (
-            <AskPage
-              streams={filtered}
-              question={question}
-              setQuestion={setQuestion}
-              answer={answer}
-              streaming={streaming}
-              onAsk={askClaude}
-              onSuggest={setQuestion}
-            />
+              <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: ACCENT, fontFamily: 'var(--font-space-grotesk)', lineHeight: 1 }}>MAJORFORM</div>
+                <div style={{ fontSize: '0.6rem', color: TEXT_SEC, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{PAGE_LABELS[page]}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button onClick={() => setIsDark(d => !d)} style={{
+                  padding: '6px 10px', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer',
+                  border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
+                }}>
+                  {isDark ? '☀' : '☾'}
+                </button>
+                <button
+                  onClick={() => setFiltersOpen(o => !o)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer',
+                    border: `1px solid ${activeFilters > 0 ? ACCENT : BORDER}`,
+                    background: activeFilters > 0 ? 'rgba(200,245,74,0.12)' : 'transparent',
+                    color: activeFilters > 0 ? ACCENT : TEXT_SEC,
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  ⚙ Filters{activeFilters > 0 ? ` (${activeFilters})` : ''}
+                </button>
+                <button onClick={() => load(true)} disabled={refreshing} style={{
+                  padding: '6px 10px', borderRadius: 6, fontSize: '0.8rem', cursor: 'pointer',
+                  border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC,
+                }}>
+                  {refreshing ? '…' : '↻'}
+                </button>
+              </div>
+            </div>
           )}
-        </div>
-      </main>
 
-      <FloatingChat streams={filtered} />
-    </div>
+          {/* ── Mobile filter drawer ── */}
+          {isMobile && filtersOpen && (
+            <div style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {([
+                ['Status', selectedStatus, setSelectedStatus, STATUS_OPTIONS],
+                ['Month', selectedMonth, setSelectedMonth, months],
+                ['Platform', selectedPlatform, setSelectedPlatform, ['All', 'TikTok', 'Shopee']],
+                ['Brand', selectedBrand, setSelectedBrand, brands],
+              ] as [string, string, (v: string) => void, string[]][]).map(([label, val, setter, opts]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: '0.75rem', color: TEXT_SEC, width: 60, flexShrink: 0 }}>{label}</span>
+                  <select value={val} onChange={e => setter(e.target.value)} style={selectStyle}>
+                    {opts.map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
+                <span style={{ fontSize: '0.7rem', color: TEXT_SEC }}>{filtered.length} streams</span>
+                {activeFilters > 0 && (
+                  <button onClick={() => { setSelectedStatus('All'); setSelectedMonth('All'); setSelectedPlatform('All'); setSelectedBrand('All') }}
+                    style={{ fontSize: '0.75rem', color: '#F87171', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Desktop top bar ── */}
+          {!isMobile && (
+            <div style={{
+              padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, background: SURFACE,
+              display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 10,
+            }}>
+              {([
+                ['Status:', selectedStatus, setSelectedStatus, STATUS_OPTIONS],
+                ['Month:', selectedMonth, setSelectedMonth, months],
+                ['Platform:', selectedPlatform, setSelectedPlatform, ['All', 'TikTok', 'Shopee']],
+                ['Brand:', selectedBrand, setSelectedBrand, brands],
+              ] as [string, string, (v: string) => void, string[]][]).map(([label, val, setter, opts]) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: '0.7rem', color: TEXT_SEC, whiteSpace: 'nowrap' }}>{label}</span>
+                  <select value={val} onChange={e => setter(e.target.value)} style={{ ...selectStyle, width: 'auto' }}>
+                    {opts.map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+              ))}
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+                {cachedAt && <span style={{ fontSize: '0.7rem', color: TEXT_SEC }}>Synced {new Date(cachedAt).toLocaleTimeString('en-SG')}</span>}
+                <button onClick={() => setIsDark(d => !d)} style={{ padding: '5px 12px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer', border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC }}>
+                  {isDark ? '☀ Light' : '☾ Dark'}
+                </button>
+                <button onClick={() => load(true)} disabled={refreshing} style={{ padding: '5px 14px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer', border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC }}>
+                  {refreshing ? 'Refreshing...' : '↻ Refresh'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Page content ── */}
+          <div style={{ padding: isMobile ? 16 : 32, flex: 1 }}>
+            {pageContent}
+          </div>
+        </main>
+
+        {/* ── Mobile bottom nav ── */}
+        {isMobile && (
+          <nav style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+            background: SURFACE, borderTop: `1px solid ${BORDER}`,
+            display: 'flex', height: 56,
+          }}>
+            {(['overview', 'streamers', 'brands', 'timeslots', 'planning', 'ask'] as Page[]).map(p => {
+              const active = page === p
+              return (
+                <button key={p} onClick={() => { setPage(p); setFiltersOpen(false) }} style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 2, background: 'none', border: 'none', cursor: 'pointer',
+                  borderTop: active ? `2px solid ${ACCENT}` : '2px solid transparent',
+                  color: active ? ACCENT : TEXT_SEC, padding: '6px 0',
+                }}>
+                  <span style={{ fontSize: '1rem', lineHeight: 1 }}>{PAGE_ICONS[p]}</span>
+                  <span style={{ fontSize: '0.55rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>{PAGE_LABELS[p]}</span>
+                </button>
+              )
+            })}
+          </nav>
+        )}
+
+        <FloatingChat streams={filtered} />
+      </div>
+    </MobileCtx.Provider>
   )
 }
 
 // ─── Overview ────────────────────────────────────────────────────────────────
 
 function OverviewPage({ streams }: { streams: Stream[] }) {
+  const isMobile = useMobile()
   const totalGmv = streams.reduce((a, s) => a + s.totalGmv, 0)
   const totalStreams = streams.length
   const avgGmvHour = streams.length > 0
@@ -543,118 +645,102 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
     .filter(s => { const d = new Date(s.date); return d >= sevenDaysAgo && d <= now })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
+  const DayBlock = ({ label, color, count, gmv, avg, note }: { label: string; color: string; count: number; gmv: number; avg: number; note?: string }) => (
+    <div style={{ flex: 1, ...cardStyle, borderLeft: `3px solid ${color}` }}>
+      <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color, marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', gap: isMobile ? 10 : 20, flexWrap: 'wrap' }}>
+        {[['streams', String(count)], ['total GMV', fmtShort(gmv)], ['avg/stream', fmtShort(avg)]].map(([lbl, val]) => (
+          <div key={lbl}>
+            <div style={{ fontSize: isMobile ? '1rem' : '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{val}</div>
+            <div style={{ fontSize: '0.65rem', color: TEXT_SEC }}>{lbl}</div>
+          </div>
+        ))}
+      </div>
+      {note && <div style={{ fontSize: '0.62rem', color: TEXT_SEC, marginTop: 8 }}>{note}</div>}
+    </div>
+  )
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4,1fr)', gap: isMobile ? 10 : 16 }}>
         <KpiCard label="Total GMV" value={fmtShort(totalGmv)} />
-        <KpiCard label="Total Streams" value={String(totalStreams)} />
-        <KpiCard label="Avg GMV / Hour" value={fmtShort(avgGmvHour)} />
-        <KpiCard
-          label="Top Streamer"
-          value={topTalent ? topTalent[0] : '—'}
-          sub={topTalent ? fmtShort(topTalent[1]) : undefined}
-        />
+        <KpiCard label="Streams" value={String(totalStreams)} />
+        <KpiCard label="Avg GMV/Hr" value={fmtShort(avgGmvHour)} />
+        <KpiCard label="Top Streamer" value={topTalent ? topTalent[0] : '—'} sub={topTalent ? fmtShort(topTalent[1]) : undefined} />
       </div>
 
-      {/* Mega vs BAU */}
-      <div style={{ display: 'flex', gap: 16 }}>
-        <div style={{ flex: 1, ...cardStyle, borderLeft: `3px solid #F59E0B` }}>
-          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#F59E0B', marginBottom: 6 }}>🔥 Mega Days</div>
-          <div style={{ display: 'flex', gap: 24 }}>
-            <div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{megaBau.mega.length}</div>
-              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>streams</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.megaGmv)}</div>
-              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>total GMV</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.megaAvg)}</div>
-              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>avg GMV/stream</div>
-            </div>
-          </div>
-          <div style={{ fontSize: '0.65rem', color: TEXT_SEC, marginTop: 8 }}>Double-digit (6.6, 7.7…) · Mid-month (14–15) · Payday (24–25) + day before each</div>
-        </div>
-        <div style={{ flex: 1, ...cardStyle, borderLeft: `3px solid ${BORDER}` }}>
-          <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 6 }}>📅 BAU Days</div>
-          <div style={{ display: 'flex', gap: 24 }}>
-            <div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{megaBau.bau.length}</div>
-              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>streams</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.bauGmv)}</div>
-              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>total GMV</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: TEXT_PRI, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(megaBau.bauAvg)}</div>
-              <div style={{ fontSize: '0.7rem', color: TEXT_SEC }}>avg GMV/stream</div>
-            </div>
-          </div>
-          <div style={{ fontSize: '0.65rem', color: TEXT_SEC, marginTop: 8 }}>All other days</div>
-        </div>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 16 }}>
+        <DayBlock label="🔥 Mega Days" color="#F59E0B" count={megaBau.mega.length} gmv={megaBau.megaGmv} avg={megaBau.megaAvg} note="Double-digit (6.6, 7.7…) · Mid-month (14–15) · Payday (24–25) + day before" />
+        <DayBlock label="📅 BAU Days" color={BORDER} count={megaBau.bau.length} gmv={megaBau.bauGmv} avg={megaBau.bauAvg} note="All other days" />
       </div>
 
-      <div style={{ display: 'flex', gap: 16 }}>
-        <div style={{ flex: 2, ...cardStyle }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 16 }}>
+        <div style={{ flex: 2, ...cardStyle, padding: isMobile ? 14 : 20 }}>
           <SectionLabel>Monthly Total GMV &amp; GMV / Hour</SectionLabel>
-          <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={monthlyData} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
-              <XAxis dataKey="name" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis yAxisId="gmv" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
-              <YAxis yAxisId="rate" orientation="right" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
-              <Tooltip
-                contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }}
-                formatter={(v, name) => [fmtShort(Number(v)), name === 'totalGmv' ? 'Total GMV' : 'GMV / Hour']}
-                cursor={{ fill: 'rgba(255,255,255,0.03)' }}
-              />
+          <ResponsiveContainer width="100%" height={isMobile ? 160 : 220}>
+            <ComposedChart data={monthlyData} margin={{ top: 8, right: isMobile ? 4 : 48, bottom: 0, left: 0 }}>
+              <XAxis dataKey="name" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} />
+              <YAxis yAxisId="gmv" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} width={32} />
+              {!isMobile && <YAxis yAxisId="rate" orientation="right" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />}
+              <Tooltip contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }} formatter={(v, name) => [fmtShort(Number(v)), name === 'totalGmv' ? 'Total GMV' : 'GMV / Hour']} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
               <Bar yAxisId="gmv" dataKey="totalGmv" name="totalGmv" fill={ACCENT} radius={[3,3,0,0]} opacity={0.85} />
-              <Line yAxisId="rate" dataKey="gmvPerHour" name="gmvPerHour" stroke="#60A5FA" strokeWidth={2} dot={{ fill: '#60A5FA', r: 3 }} />
+              <Line yAxisId={isMobile ? 'gmv' : 'rate'} dataKey="gmvPerHour" name="gmvPerHour" stroke="#60A5FA" strokeWidth={2} dot={{ fill: '#60A5FA', r: 2 }} />
             </ComposedChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 10, height: 10, background: ACCENT, borderRadius: 2, display: 'inline-block' }} /> Total GMV
-            </span>
-            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 10, height: 2, background: '#60A5FA', display: 'inline-block' }} /> GMV / Hour
-            </span>
+            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, background: ACCENT, borderRadius: 2, display: 'inline-block' }} /> Total GMV</span>
+            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 2, background: '#60A5FA', display: 'inline-block' }} /> GMV / Hour</span>
           </div>
         </div>
-        <div style={{ flex: 1, ...cardStyle }}>
+        <div style={{ flex: 1, ...cardStyle, padding: isMobile ? 14 : 20 }}>
           <SectionLabel>Platform Split</SectionLabel>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2}>
-                {pieData.map((entry, i) => (
-                  <Cell key={i} fill={entry.name === 'TikTok' ? TIKTOK_COLOR : SHOPEE_COLOR} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v) => fmtShort(Number(v))} contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }} />
-              <Legend wrapperStyle={{ fontSize: '0.75rem', color: TEXT_SEC }} />
-            </PieChart>
-          </ResponsiveContainer>
+          {isMobile ? (
+            <div style={{ display: 'flex', gap: 12 }}>
+              {pieData.map(d => (
+                <div key={d.name} style={{ flex: 1, textAlign: 'center', padding: '10px 0' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: d.name === 'TikTok' ? TIKTOK_COLOR : SHOPEE_COLOR, fontFamily: 'var(--font-space-grotesk)' }}>{fmtShort(d.value)}</div>
+                  <div style={{ fontSize: '0.75rem', color: TEXT_SEC, marginTop: 2 }}>{d.name}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2}>
+                  {pieData.map((entry, i) => <Cell key={i} fill={entry.name === 'TikTok' ? TIKTOK_COLOR : SHOPEE_COLOR} />)}
+                </Pie>
+                <Tooltip formatter={(v) => fmtShort(Number(v))} contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }} />
+                <Legend wrapperStyle={{ fontSize: '0.75rem', color: TEXT_SEC }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
       <div style={cardStyle}>
         <SectionLabel>Recent Streams — Last 7 Days ({recent.length})</SectionLabel>
         {recent.length === 0 ? (
-          <div style={{ color: TEXT_SEC, fontSize: '0.8rem', padding: '12px 0' }}>No streams in the last 7 days with current filters.</div>
+          <div style={{ color: TEXT_SEC, fontSize: '0.8rem', padding: '12px 0' }}>No streams in the last 7 days.</div>
+        ) : isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {recent.map((s, i) => (
+              <div key={i} style={{ padding: '12px 14px', background: SURFACE_RAISED, borderRadius: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, color: TEXT_PRI, fontSize: '0.9rem' }}>{s.talent}</span>
+                  <StatusBadge status={s.status} />
+                </div>
+                <div style={{ fontSize: '0.78rem', color: TEXT_SEC, marginBottom: 4 }}>{new Date(s.date).toLocaleDateString('en-SG')} · {s.brand ?? '—'} · {s.platform ?? '—'}</div>
+                <div style={{ fontSize: '0.95rem', color: ACCENT, fontWeight: 700, fontFamily: 'var(--font-space-grotesk)' }}>{s.totalGmv > 0 ? fmt(s.totalGmv) : '—'}</div>
+              </div>
+            ))}
+          </div>
         ) : (
           <Table
             headers={['Date', 'Day', 'Talent', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Status']}
             rows={recent.map(s => [
-              new Date(s.date).toLocaleDateString('en-SG'),
-              s.dayOfWeek,
-              s.talent,
-              s.brand ?? '—',
-              s.platform ?? '—',
-              s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—',
-              s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—',
-              s.totalGmv > 0 ? fmt(s.totalGmv) : '—',
-              <StatusBadge key="s" status={s.status} />,
+              new Date(s.date).toLocaleDateString('en-SG'), s.dayOfWeek, s.talent, s.brand ?? '—', s.platform ?? '—',
+              s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—', s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—',
+              s.totalGmv > 0 ? fmt(s.totalGmv) : '—', <StatusBadge key="s" status={s.status} />,
             ])}
           />
         )}
@@ -669,6 +755,7 @@ type SortCol = 'talent' | 'count' | 'totalGmv' | 'avgGmvStream' | 'avgGmvHour' |
 type SortDir = 'asc' | 'desc'
 
 function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; expanded: string | null; setExpanded: (v: string | null) => void }) {
+  const isMobile = useMobile()
   const [sortCol, setSortCol] = useState<SortCol>('totalGmv')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -727,7 +814,7 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={cardStyle}>
         <SectionLabel>GMV by Streamer</SectionLabel>
-        <ResponsiveContainer width="100%" height={Math.max(180, chartData.length * 36)}>
+        <ResponsiveContainer width="100%" height={Math.max(isMobile ? 140 : 180, chartData.length * (isMobile ? 28 : 36))}>
           <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 20, bottom: 4, left: 60 }}>
             <XAxis type="number" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
             <YAxis type="category" dataKey="name" tick={{ fill: TEXT_PRI, fontSize: 12 }} axisLine={false} tickLine={false} width={56} />
@@ -1424,10 +1511,11 @@ function AskPage({ streams, question, setQuestion, answer, streaming, onAsk, onS
   onAsk: () => void
   onSuggest: (v: string) => void
 }) {
+  const isMobile = useMobile()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: isMobile ? '100%' : 800 }}>
       <div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: TEXT_PRI, marginBottom: 4 }}>Ask Claude</h2>
         <p style={{ color: TEXT_SEC, fontSize: '0.875rem' }}>
