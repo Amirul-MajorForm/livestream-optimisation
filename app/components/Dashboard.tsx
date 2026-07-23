@@ -133,6 +133,93 @@ const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
+// ─── MultiSelect ─────────────────────────────────────────────────────────────
+
+function MultiSelect({
+  label,
+  options,
+  selected,
+  onChange,
+  isMobile,
+}: {
+  label: string
+  options: string[]
+  selected: string[]
+  onChange: (vals: string[]) => void
+  isMobile: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const toggle = (opt: string) => {
+    if (selected.includes(opt)) onChange(selected.filter(v => v !== opt))
+    else onChange([...selected, opt])
+  }
+
+  const display = selected.length === 0 ? 'All' : selected.length === 1 ? selected[0] : `${selected.length} selected`
+  const active = selected.length > 0
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: isMobile ? '100%' : 'auto' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: active ? 'rgba(var(--ds-accent-raw),0.12)' : SURFACE_RAISED,
+          border: `1px solid ${active ? ACCENT : BORDER}`,
+          color: active ? ACCENT : TEXT_PRI,
+          borderRadius: 4, padding: isMobile ? '7px 10px' : '4px 10px',
+          fontSize: isMobile ? '0.875rem' : '0.75rem',
+          cursor: 'pointer', whiteSpace: 'nowrap', width: isMobile ? '100%' : 'auto',
+          justifyContent: isMobile ? 'space-between' : 'flex-start',
+        }}
+      >
+        <span style={{ color: TEXT_SEC, fontSize: isMobile ? '0.8rem' : '0.7rem', marginRight: 2 }}>{label}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{display}</span>
+        <span style={{ color: TEXT_SEC, fontSize: '0.7rem', marginLeft: 2 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, zIndex: 500, marginTop: 4,
+          background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', minWidth: 180, maxHeight: 260, overflowY: 'auto',
+        }}>
+          {selected.length > 0 && (
+            <button
+              onClick={() => { onChange([]); setOpen(false) }}
+              style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', borderBottom: `1px solid ${BORDER}`, color: '#F87171', fontSize: '0.75rem', cursor: 'pointer' }}
+            >
+              Clear selection
+            </button>
+          )}
+          {options.map(opt => (
+            <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', fontSize: '0.8rem', color: TEXT_PRI }}
+              onMouseEnter={e => (e.currentTarget.style.background = SURFACE)}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(opt)}
+                onChange={() => toggle(opt)}
+                style={{ accentColor: String(ACCENT), width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }}
+              />
+              {opt}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Mobile context ──────────────────────────────────────────────────────────
 
 const MobileCtx = createContext(false)
@@ -269,15 +356,15 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false)
 
   const [page, setPage] = useState<Page>('overview')
-  const [selectedStatus, setSelectedStatus] = useState<string>('All')
-  const [selectedMonth, setSelectedMonth] = useState<string>('All')
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('All')
-  const [selectedBrand, setSelectedBrand] = useState<string>('All')
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([])
+  const [selectedAccountTypes, setSelectedAccountTypes] = useState<string[]>([])
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   const [isDark, setIsDark] = useState(true)
   const [expandedTalent, setExpandedTalent] = useState<string | null>(null)
-  const [brandAccountFilter, setBrandAccountFilter] = useState<string>('All')
 
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
@@ -321,20 +408,21 @@ export default function Dashboard() {
 
   const filtered = useMemo(() => {
     return allStreams.filter(s => {
-      if (selectedStatus !== 'All' && s.status !== selectedStatus) return false
-      if (selectedMonth !== 'All') {
+      if (selectedStatuses.length > 0 && !selectedStatuses.includes(s.status ?? '')) return false
+      if (selectedMonths.length > 0) {
         const d = new Date(s.date)
         const m = `${d.toLocaleString('en-SG', { month: 'short' })} ${d.getFullYear()}`
-        if (m !== selectedMonth) return false
+        if (!selectedMonths.includes(m)) return false
       }
-      if (selectedPlatform !== 'All') {
+      if (selectedPlatforms.length > 0) {
         const p = s.platform ?? ''
-        if (!p.toLowerCase().includes(selectedPlatform.toLowerCase())) return false
+        if (!selectedPlatforms.some(plat => p.toLowerCase().includes(plat.toLowerCase()))) return false
       }
-      if (selectedBrand !== 'All' && s.brand !== selectedBrand) return false
+      if (selectedBrands.length > 0 && !selectedBrands.includes(s.brand ?? '')) return false
+      if (selectedAccountTypes.length > 0 && !selectedAccountTypes.includes(s.account ?? '')) return false
       return true
     })
-  }, [allStreams, selectedStatus, selectedMonth, selectedPlatform, selectedBrand])
+  }, [allStreams, selectedStatuses, selectedMonths, selectedPlatforms, selectedBrands, selectedAccountTypes])
 
   const askClaude = async () => {
     if (!question.trim() || streaming) return
@@ -386,15 +474,15 @@ export default function Dashboard() {
     timeslots: 'Timeslots', planning: 'Planning', ask: 'Ask',
   }
 
-  const activeFilters = [selectedStatus, selectedMonth, selectedPlatform, selectedBrand].filter(v => v !== 'All').length
+  const activeFilters = selectedStatuses.length + selectedMonths.length + selectedPlatforms.length + selectedBrands.length + selectedAccountTypes.length
 
   const pageContent = (
     <>
       {page === 'overview' && <OverviewPage streams={filtered} />}
       {page === 'streamers' && <StreamersPage streams={filtered} expanded={expandedTalent} setExpanded={setExpandedTalent} />}
-      {page === 'brands' && <BrandsPage streams={filtered} accountFilter={brandAccountFilter} setAccountFilter={setBrandAccountFilter} />}
+      {page === 'brands' && <BrandsPage streams={filtered} accountFilter={selectedAccountTypes} setAccountFilter={setSelectedAccountTypes} />}
       {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
-      {page === 'planning' && <PlanningPage allStreams={allStreams} selectedBrand={selectedBrand} />}
+      {page === 'planning' && <PlanningPage allStreams={allStreams} selectedBrands={selectedBrands} />}
       {page === 'ask' && (
         <AskPage
           streams={filtered}
@@ -492,23 +580,15 @@ export default function Dashboard() {
           {/* ── Mobile filter drawer ── */}
           {isMobile && filtersOpen && (
             <div style={{ background: SURFACE, borderBottom: `1px solid ${BORDER}`, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {([
-                ['Status', selectedStatus, setSelectedStatus, STATUS_OPTIONS],
-                ['Month', selectedMonth, setSelectedMonth, months],
-                ['Platform', selectedPlatform, setSelectedPlatform, ['All', 'TikTok', 'Shopee']],
-                ['Brand', selectedBrand, setSelectedBrand, brands],
-              ] as [string, string, (v: string) => void, string[]][]).map(([label, val, setter, opts]) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: '0.75rem', color: TEXT_SEC, width: 60, flexShrink: 0 }}>{label}</span>
-                  <select value={val} onChange={e => setter(e.target.value)} style={selectStyle}>
-                    {opts.map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-              ))}
+              <MultiSelect label="Status" options={STATUS_OPTIONS.slice(1)} selected={selectedStatuses} onChange={setSelectedStatuses} isMobile={true} />
+              <MultiSelect label="Month" options={months.slice(1)} selected={selectedMonths} onChange={setSelectedMonths} isMobile={true} />
+              <MultiSelect label="Platform" options={['TikTok', 'Shopee']} selected={selectedPlatforms} onChange={setSelectedPlatforms} isMobile={true} />
+              <MultiSelect label="Brand" options={brands.slice(1)} selected={selectedBrands} onChange={setSelectedBrands} isMobile={true} />
+              <MultiSelect label="Account Type" options={['Brand', 'Creator']} selected={selectedAccountTypes} onChange={setSelectedAccountTypes} isMobile={true} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4 }}>
                 <span style={{ fontSize: '0.7rem', color: TEXT_SEC }}>{filtered.length} streams</span>
                 {activeFilters > 0 && (
-                  <button onClick={() => { setSelectedStatus('All'); setSelectedMonth('All'); setSelectedPlatform('All'); setSelectedBrand('All') }}
+                  <button onClick={() => { setSelectedStatuses([]); setSelectedMonths([]); setSelectedPlatforms([]); setSelectedBrands([]); setSelectedAccountTypes([]) }}
                     style={{ fontSize: '0.75rem', color: '#F87171', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                     Clear all
                   </button>
@@ -520,22 +600,20 @@ export default function Dashboard() {
           {/* ── Desktop top bar ── */}
           {!isMobile && (
             <div style={{
-              padding: '12px 24px', borderBottom: `1px solid ${BORDER}`, background: SURFACE,
-              display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 10,
+              padding: '10px 24px', borderBottom: `1px solid ${BORDER}`, background: SURFACE,
+              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 10,
             }}>
-              {([
-                ['Status:', selectedStatus, setSelectedStatus, STATUS_OPTIONS],
-                ['Month:', selectedMonth, setSelectedMonth, months],
-                ['Platform:', selectedPlatform, setSelectedPlatform, ['All', 'TikTok', 'Shopee']],
-                ['Brand:', selectedBrand, setSelectedBrand, brands],
-              ] as [string, string, (v: string) => void, string[]][]).map(([label, val, setter, opts]) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: '0.7rem', color: TEXT_SEC, whiteSpace: 'nowrap' }}>{label}</span>
-                  <select value={val} onChange={e => setter(e.target.value)} style={{ ...selectStyle, width: 'auto' }}>
-                    {opts.map(o => <option key={o}>{o}</option>)}
-                  </select>
-                </div>
-              ))}
+              <MultiSelect label="Status" options={STATUS_OPTIONS.slice(1)} selected={selectedStatuses} onChange={setSelectedStatuses} isMobile={false} />
+              <MultiSelect label="Month" options={months.slice(1)} selected={selectedMonths} onChange={setSelectedMonths} isMobile={false} />
+              <MultiSelect label="Platform" options={['TikTok', 'Shopee']} selected={selectedPlatforms} onChange={setSelectedPlatforms} isMobile={false} />
+              <MultiSelect label="Brand" options={brands.slice(1)} selected={selectedBrands} onChange={setSelectedBrands} isMobile={false} />
+              <MultiSelect label="Account Type" options={['Brand', 'Creator']} selected={selectedAccountTypes} onChange={setSelectedAccountTypes} isMobile={false} />
+              {activeFilters > 0 && (
+                <button onClick={() => { setSelectedStatuses([]); setSelectedMonths([]); setSelectedPlatforms([]); setSelectedBrands([]); setSelectedAccountTypes([]) }}
+                  style={{ padding: '4px 10px', borderRadius: 4, fontSize: '0.72rem', cursor: 'pointer', border: `1px solid #F87171`, background: 'rgba(248,113,113,0.1)', color: '#F87171' }}>
+                  Clear all
+                </button>
+              )}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
                 {cachedAt && <span style={{ fontSize: '0.7rem', color: TEXT_SEC }}>Synced {new Date(cachedAt).toLocaleTimeString('en-SG')}</span>}
                 <button onClick={() => setIsDark(d => !d)} style={{ padding: '5px 12px', borderRadius: 4, fontSize: '0.75rem', cursor: 'pointer', border: `1px solid ${BORDER}`, background: 'transparent', color: TEXT_SEC }}>
@@ -893,12 +971,12 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
 
 type BrandSortCol = 'brand' | 'count' | 'tiktokGmv' | 'shopeeGmv' | 'totalGmv' | 'avgGmvHour' | 'megaAvg' | 'bauAvg' | 'topTalent'
 
-function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Stream[]; accountFilter: string; setAccountFilter: (v: string) => void }) {
+function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Stream[]; accountFilter: string[]; setAccountFilter: (v: string[]) => void }) {
   const [sortCol, setSortCol] = useState<BrandSortCol>('totalGmv')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const filtered = useMemo(() =>
-    accountFilter === 'All' ? streams : streams.filter(s => s.account === accountFilter)
+    accountFilter.length === 0 ? streams : streams.filter(s => accountFilter.includes(s.account ?? ''))
   , [streams, accountFilter])
 
   const brandData = useMemo(() => {
@@ -950,15 +1028,9 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {['All', 'Brand', 'Creator'].map(f => (
-          <button key={f} onClick={() => setAccountFilter(f)} style={{
-            padding: '5px 14px', borderRadius: 4, fontSize: '0.8rem', cursor: 'pointer',
-            border: `1px solid ${accountFilter === f ? ACCENT : BORDER}`,
-            background: accountFilter === f ? 'rgba(200,245,74,0.1)' : 'transparent',
-            color: accountFilter === f ? ACCENT : TEXT_SEC,
-          }}>{f}</button>
-        ))}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ fontSize: '0.75rem', color: TEXT_SEC }}>Account Type:</span>
+        <MultiSelect label="" options={['Brand', 'Creator']} selected={accountFilter} onChange={setAccountFilter} isMobile={false} />
       </div>
       <div style={cardStyle}>
         <SectionLabel>Brand Rankings — click column headers to sort</SectionLabel>
@@ -1153,16 +1225,16 @@ function isTBC(s: Stream): boolean {
 
 interface ChatMsg { role: 'user' | 'assistant'; text: string }
 
-function PlanningPage({ allStreams, selectedBrand }: { allStreams: Stream[]; selectedBrand: string }) {
+function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; selectedBrands: string[] }) {
   const planned = useMemo(() => {
     const now = new Date()
     return allStreams.filter(s => {
       if (!isTBC(s)) return false
-      if (selectedBrand !== 'All' && s.brand !== selectedBrand) return false
+      if (selectedBrands.length > 0 && !selectedBrands.includes(s.brand ?? '')) return false
       const d = new Date(s.date)
       return d >= now
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }, [allStreams, selectedBrand])
+  }, [allStreams, selectedBrands])
 
   const historical = useMemo(() =>
     allStreams.filter(s => ['Paid', 'Invoice Sent', 'Invoice Pending'].includes(s.status ?? ''))
