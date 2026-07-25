@@ -41,12 +41,12 @@ export async function fetchPlanningContext(): Promise<{ availability: string; no
   const [availRes, notesRes] = await Promise.all([
     sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: "'Streamer Availability'!A1:Z200",
+      range: "'Streamer Availability'!A1:AZ500",
       valueRenderOption: 'FORMATTED_VALUE',
     }).catch(() => null),
     sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: "'Planning Notes'!A1:Z200",
+      range: "'Planning Notes'!A1:AZ500",
       valueRenderOption: 'FORMATTED_VALUE',
     }).catch(() => null),
   ])
