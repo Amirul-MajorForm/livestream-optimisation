@@ -1202,9 +1202,7 @@ function renderMd(text: string): React.ReactNode[] {
     if (part.startsWith('**') && part.endsWith('**')) {
       const inner = part.slice(2, -2)
       const upper = inner.toUpperCase()
-      const color = upper.includes('CONFIRMED CONFLICT') ? '#F87171'
-        : upper.includes('POTENTIAL CONFLICT') ? '#FB923C'
-        : TEXT_PRI
+      const color = upper.includes('CONFIRMED CONFLICT') ? '#F87171' : TEXT_PRI
       return <strong key={i} style={{ color, fontWeight: 700 }}>{inner}</strong>
     }
     return part

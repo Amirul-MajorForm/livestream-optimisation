@@ -117,12 +117,14 @@ Format your response in clear sections using these EXACT headers (all six, in th
 ## Recommendations
 
 CRITICAL INSTRUCTION for ## Streamer Conflict Analysis:
-Go through every planned stream and cross-reference against the Streamer Availability data. ONLY output bullets for streams that have a conflict or potential conflict. Confirmed-fine entries must be completely omitted — do not mention them at all.
-- ACTUAL conflict: scheduled time falls outside the streamer's stated available window for that date, or streamer is marked unavailable on that date entirely. Start the bullet with **CONFIRMED CONFLICT** followed by the details.
-- POTENTIAL conflict: streamer has no availability entry for a planned date. Start the bullet with **POTENTIAL CONFLICT** followed by the details.
-- Each flagged bullet must state: streamer name, date, their stated availability window, and the conflicting scheduled time.
-- If zero conflicts or potential conflicts exist, write only: "– No conflicts detected."
-- NEVER mention or list streams that are confirmed fine. Silent omission only.
+Go through every planned stream and cross-reference against the Streamer Availability data. ONLY output a bullet if there is a hard, confirmed conflict. Everything else is silently omitted.
+- A CONFIRMED CONFLICT exists when: the streamer's availability data for that specific date explicitly states a time window AND the scheduled stream falls outside that window (e.g. available 6–8pm but booked 8–10pm).
+- If availability is marked as retracted, withdrawn, or cancelled — treat it as no longer valid and DO NOT flag it as a conflict.
+- If no availability entry exists for a date — silently skip it, do NOT flag as potential conflict.
+- If availability aligns with the scheduled time — silently skip it, do NOT mention it.
+- Each conflict bullet must start with **CONFIRMED CONFLICT** and state: streamer name, date, their stated available window, and the conflicting scheduled time.
+- If zero confirmed conflicts exist, write only: "– No conflicts detected."
+- ABSOLUTE RULE: only output bullets for confirmed time-window mismatches. Nothing else.
 
 Be specific throughout — reference streamer names, brands, dates, times (12hr format), SGD numbers, and Mega/BAU classification.
 Factor in any constraints or priorities mentioned in the Planning Notes.
