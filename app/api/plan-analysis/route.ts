@@ -117,14 +117,16 @@ Format your response in clear sections using these EXACT headers (all six, in th
 ## Recommendations
 
 CRITICAL INSTRUCTION for ## Streamer Conflict Analysis:
-Go through every planned stream and cross-reference against the Streamer Availability data. ONLY output a bullet if there is a hard, confirmed conflict. Everything else is silently omitted.
-- A CONFIRMED CONFLICT exists when: the streamer's availability data for that specific date explicitly states a time window AND the scheduled stream falls outside that window (e.g. available 6–8pm but booked 8–10pm).
-- If availability is marked as retracted, withdrawn, or cancelled — treat it as no longer valid and DO NOT flag it as a conflict.
-- If no availability entry exists for a date — silently skip it, do NOT flag as potential conflict.
-- If availability aligns with the scheduled time — silently skip it, do NOT mention it.
-- Each conflict bullet must start with **CONFIRMED CONFLICT** and state: streamer name, date, their stated available window, and the conflicting scheduled time.
-- If zero confirmed conflicts exist, write only: "– No conflicts detected."
-- ABSOLUTE RULE: only output bullets for confirmed time-window mismatches. Nothing else.
+Before writing this section, silently reason through each planned stream one by one:
+  Step 1 — Does this streamer have an availability entry for this exact date? If NO → skip entirely, write nothing.
+  Step 2 — Does the scheduled time fall OUTSIDE their stated available window? If NO (time is within the window) → skip entirely, write nothing.
+  Step 3 — Only if YES to both: output a bullet starting with **CONFIRMED CONFLICT**.
+
+Rules:
+- Each conflict bullet must state: streamer name, date, their stated available window, and the conflicting scheduled time.
+- If zero confirmed conflicts exist after going through all streams, write only: "– No conflicts detected."
+- DO NOT output anything for streams where availability aligns, availability is missing, or you are uncertain.
+- ABSOLUTE RULE: the only allowed outputs are **CONFIRMED CONFLICT** bullets OR the single line "– No conflicts detected." No other text, no caveats, no "confirmed fine" notes.
 
 Be specific throughout — reference streamer names, brands, dates, times (12hr format), SGD numbers, and Mega/BAU classification.
 Factor in any constraints or priorities mentioned in the Planning Notes.
@@ -151,7 +153,6 @@ Analyse the planned streams against the historical data. Identify risks, imbalan
   const stream = await client.messages.stream({
     model: 'claude-sonnet-4-6',
     max_tokens: 4000,
-    thinking: { type: 'adaptive' },
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }],
   })
