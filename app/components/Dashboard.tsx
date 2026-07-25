@@ -54,6 +54,7 @@ const DARK_VARS = {
   '--ds-text-pri': '#F0F0F0',
   '--ds-text-sec': '#888888',
   '--ds-accent-raw': '200,245,74',
+  '--ds-hover': '#222222',
 } as React.CSSProperties
 
 const LIGHT_VARS = {
@@ -65,6 +66,7 @@ const LIGHT_VARS = {
   '--ds-text-pri': '#111111',
   '--ds-text-sec': '#555555',
   '--ds-accent-raw': '43,58,85',
+  '--ds-hover': '#E8EDF5',
 } as React.CSSProperties
 
 const fmt = (n: number) =>
@@ -929,7 +931,7 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
               {sorted.map((t, ri) => (
                 <>
                   <tr key={t.talent} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#222222')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
                   >
                     <td style={tdStyle}>
@@ -1060,7 +1062,7 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
             <tbody>
               {sorted.map((b, ri) => (
                 <tr key={b.brand} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#222222')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
                 >
                   <td style={tdStyle}>{b.brand}</td>
@@ -1449,9 +1451,16 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
         {scheduleOpen && (
           <div style={{ marginTop: 16 }}>
             <Table
-              headers={['Date', 'Day', 'Time', 'Talent', 'Brand', 'Platform', 'Hours', 'Status']}
-              rows={planned.map(s => [
+              headers={['Date', 'Type', 'Day', 'Time', 'Talent', 'Brand', 'Platform', 'Hours', 'Status']}
+              rows={planned.map(s => {
+                const dayType = getDayType(s.date)
+                return [
                 new Date(s.date).toLocaleDateString('en-SG'),
+                <span key="dt" style={{
+                  fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                  background: dayType === 'Mega' ? 'rgba(245,158,11,0.15)' : 'rgba(var(--ds-accent-raw),0.1)',
+                  color: dayType === 'Mega' ? '#F59E0B' : 'var(--ds-accent)',
+                }}>{dayType === 'Mega' ? '🔥 Mega' : 'BAU'}</span>,
                 s.dayOfWeek,
                 `${fmt12(s.startHour, s.startMinute)}–${s.endIsNextDay ? '12am' : fmt12(s.endHour, s.endMinute)}`,
                 s.talent,
@@ -1459,7 +1468,7 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                 s.platform ?? '—',
                 s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—',
                 <StatusBadge key="s" status={s.status} />,
-              ])}
+              ]})}
             />
           </div>
         )}
@@ -1718,7 +1727,7 @@ function Table({
         <tbody>
           {rows.map((row, ri) => (
             <tr key={ri} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#222222')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
             >
               {row.map((cell, ci) => (
