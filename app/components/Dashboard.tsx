@@ -374,7 +374,12 @@ export default function Dashboard() {
     try {
       if (force) {
         setRefreshing(true)
-        await fetch('/api/refresh', { method: 'POST' })
+        const res = await fetch('/api/refresh', { method: 'POST' })
+        const json = await res.json()
+        if (json.error) throw new Error(json.error)
+        setAllStreams(json.data)
+        setCachedAt(json.cachedAt)
+        return
       }
       const res = await fetch('/api/streams')
       const json = await res.json()

@@ -1,12 +1,14 @@
 import { fetchStreams } from '@/lib/sheets'
+import { getCacheTimestamp } from '@/lib/cache'
 
 export async function POST() {
   try {
     const data = await fetchStreams(true)
     return Response.json({
       success: true,
+      data,
       count: data.length,
-      refreshedAt: new Date().toISOString(),
+      cachedAt: new Date(getCacheTimestamp()).toISOString(),
     })
   } catch (err) {
     console.error('refresh error:', err)
