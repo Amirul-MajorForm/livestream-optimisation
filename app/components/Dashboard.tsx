@@ -719,8 +719,11 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
   const now = new Date()
   const sevenDaysAgo = new Date(now)
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  sevenDaysAgo.setHours(0, 0, 0, 0)
+  const endOfToday = new Date(now)
+  endOfToday.setHours(23, 59, 59, 999)
   const recent = [...streams]
-    .filter(s => { const d = new Date(s.date); return d >= sevenDaysAgo && d <= now })
+    .filter(s => { const d = new Date(s.date); return d >= sevenDaysAgo && d <= endOfToday })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   const DayBlock = ({ label, color, count, gmv, avg, note }: { label: string; color: string; count: number; gmv: number; avg: number; note?: string }) => (
@@ -1226,6 +1229,7 @@ function isTBC(s: Stream): boolean {
 interface ChatMsg { role: 'user' | 'assistant'; text: string }
 
 function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; selectedBrands: string[] }) {
+  const isMobile = useMobile()
   const planned = useMemo(() => {
     const now = new Date()
     return allStreams.filter(s => {
@@ -1379,14 +1383,14 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4,1fr)', gap: isMobile ? 10 : 16 }}>
         <KpiCard label="Planned Streams" value={String(planned.length)} />
         <KpiCard label="Streamers" value={String(byTalent.length)} />
         <KpiCard label="Brands" value={String(byBrand.length)} />
         <KpiCard label="Time Slots" value={String(byTimeslot.length)} />
       </div>
 
-      <div style={{ display: 'flex', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16 }}>
         <div style={{ flex: 1, ...cardStyle }}>
           <SectionLabel>Streams per Streamer</SectionLabel>
           <Table
@@ -1468,11 +1472,11 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
           )}
 
           {sections.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'nowrap', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'nowrap', gap: 16, overflowX: isMobile ? 'visible' : 'auto', paddingBottom: 8 }}>
               {sections.map((s, i) => (
                 <div key={i} style={{
                   ...cardStyle,
-                  minWidth: 260, maxWidth: 340, flexShrink: 0,
+                  minWidth: isMobile ? 0 : 260, maxWidth: isMobile ? '100%' : 340, flexShrink: 0,
                   borderLeft: `3px solid ${
                     s.title.toLowerCase().includes('risk') || s.title.toLowerCase().includes('flag')
                       ? '#F87171'
