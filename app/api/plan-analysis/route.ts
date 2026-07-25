@@ -129,7 +129,8 @@ SOURCE A — Streamer Availability sheet (format: "StreamerName | Date | Status"
 - If no line exists for that streamer+date → no conflict from this source.
 
 SOURCE B — Planning Notes hard time constraints only:
-- Only flag if the notes explicitly state a hard time window for that streamer on that specific date (e.g. "Esther available 6–8pm only on 20 Aug") AND the scheduled stream falls outside it.
+- Flag if the notes state a hard time window for a streamer — either for a specific date OR as a recurring rule (e.g. "available Fridays before 6pm", "only free before 6pm on Fridays") — AND a planned stream for that streamer on a matching date falls outside that window.
+- Recurring rules apply to ALL matching planned streams: if notes say "Fridays before 6pm only", check every planned stream for that streamer that falls on a Friday and flag any outside 6pm.
 - DO NOT flag preferences, scheduling style notes, trip minimisation requests, or consolidation preferences — these are NOT conflicts.
 - DO NOT flag warnings about dates where no stream is currently scheduled.
 - DO NOT flag a separate non-overlapping stream on the same day as a conflict.
