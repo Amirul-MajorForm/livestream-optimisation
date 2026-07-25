@@ -51,10 +51,13 @@ export async function fetchPlanningContext(): Promise<{ availability: string; no
     }).catch(() => null),
   ])
 
+  const RETRACTED = /\b(retract|retracted|withdrawn|cancelled|canceled|void|n\/a)\b/i
+
   const toText = (rows: string[][] | null | undefined): string => {
     if (!rows?.length) return '(empty)'
     return rows
       .filter(r => r.some(c => c?.toString().trim()))
+      .filter(r => !r.some(c => RETRACTED.test(c?.toString() ?? '')))
       .map(r => r.map(c => c?.toString().trim() ?? '').join('\t'))
       .join('\n')
   }
