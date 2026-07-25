@@ -1285,6 +1285,13 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
 
+  // Jump to first month with planned streams when data loads
+  useEffect(() => {
+    if (planned.length === 0) return
+    const first = new Date(planned[0].date)
+    setCalMonth(new Date(first.getFullYear(), first.getMonth(), 1))
+  }, [planned])
+
   // Follow-up chat
   const [followUps, setFollowUps] = useState<ChatMsg[]>([])
   const [followInput, setFollowInput] = useState('')
