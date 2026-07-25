@@ -100,6 +100,31 @@ function getBucket(hour: number): string | null {
   return null
 }
 
+const BRAND_PALETTE = [
+  { bg: 'rgba(99,102,241,0.18)', text: '#818CF8' },   // indigo
+  { bg: 'rgba(236,72,153,0.18)', text: '#F472B6' },   // pink
+  { bg: 'rgba(16,185,129,0.18)', text: '#34D399' },   // emerald
+  { bg: 'rgba(245,158,11,0.18)', text: '#FCD34D' },   // amber
+  { bg: 'rgba(239,68,68,0.18)',  text: '#F87171' },   // red
+  { bg: 'rgba(6,182,212,0.18)',  text: '#22D3EE' },   // cyan
+  { bg: 'rgba(168,85,247,0.18)', text: '#C084FC' },   // purple
+  { bg: 'rgba(249,115,22,0.18)', text: '#FB923C' },   // orange
+  { bg: 'rgba(20,184,166,0.18)', text: '#2DD4BF' },   // teal
+  { bg: 'rgba(234,179,8,0.18)',  text: '#EAB308' },   // yellow
+  { bg: 'rgba(59,130,246,0.18)', text: '#60A5FA' },   // blue
+  { bg: 'rgba(132,204,22,0.18)', text: '#A3E635' },   // lime
+]
+const brandColorCache: Record<string, typeof BRAND_PALETTE[0]> = {}
+let brandColorIndex = 0
+function getBrandColor(brand: string | null): typeof BRAND_PALETTE[0] {
+  if (!brand) return { bg: 'rgba(var(--ds-accent-raw),0.12)', text: 'var(--ds-accent)' }
+  if (!brandColorCache[brand]) {
+    brandColorCache[brand] = BRAND_PALETTE[brandColorIndex % BRAND_PALETTE.length]
+    brandColorIndex++
+  }
+  return brandColorCache[brand]
+}
+
 // Mega day = double-digit day (day===month), mid-month (14/15), or payday (24/25) — and the day before each
 function getDayType(dateStr: string): 'Mega' | 'BAU' {
   const d = new Date(dateStr)
@@ -1542,14 +1567,16 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                             <span style={{ fontSize: '0.7rem', fontWeight: 600, color: isMega ? '#F59E0B' : TEXT_SEC }}>{day}</span>
                             {isMega && <span style={{ fontSize: '0.55rem', color: '#F59E0B' }}>🔥</span>}
                           </div>
-                          {streams.map((s, si) => (
+                          {streams.map((s, si) => {
+                            const bc = getBrandColor(s.brand)
+                            return (
                             <div key={si} style={{
-                              fontSize: '0.6rem', lineHeight: 1.3, marginBottom: 2, padding: '2px 3px', borderRadius: 3,
-                              background: `rgba(var(--ds-accent-raw),0.12)`, color: ACCENT, wordBreak: 'break-word',
+                              fontSize: '0.6rem', lineHeight: 1.3, marginBottom: 2, padding: '2px 4px', borderRadius: 3,
+                              background: bc.bg, color: bc.text, wordBreak: 'break-word',
                             }} title={`${fmt12(s.startHour, s.startMinute)} ${s.talent}${s.brand ? ` · ${s.brand}` : ''}${s.platform ? ` · ${s.platform}` : ''}`}>
                               <span style={{ fontWeight: 700 }}>{fmt12(s.startHour, s.startMinute)}</span>{' '}{s.talent}{s.brand ? ` · ${s.brand}` : ''}{s.platform ? ` · ${s.platform}` : ''}
                             </div>
-                          ))}
+                          )})}
                         </div>
                       )
                     })}
