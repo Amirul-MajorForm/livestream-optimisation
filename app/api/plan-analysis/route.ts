@@ -1,7 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { fetchPlanningContext } from '@/lib/sheets'
 
 export async function POST(req: Request) {
   const { planned, historical } = await req.json()
+
+  const planningContext = await fetchPlanningContext().catch(() => ({ availability: '(unavailable)', notes: '(unavailable)' }))
 
   const client = new Anthropic()
 
@@ -99,6 +102,12 @@ KEY CONTEXT — DAY TYPES:
 - BAU days = all other days.
 Each planned stream is tagged with its dayType (Mega or BAU). Factor this heavily into your analysis — scheduling strong brands/streamers on BAU days when Mega dates are available is a missed opportunity, and vice versa (depleting a brand's best talent on BAU days before Mega dates).
 
+STREAMER AVAILABILITY (from live schedule sheet — use this to flag conflicts, double-bookings, or streamers marked unavailable on planned dates):
+${planningContext.availability}
+
+PLANNING NOTES (internal notes from the planning team — treat these as ground truth context, constraints, and priorities):
+${planningContext.notes}
+
 Format your response in clear sections using these exact headers:
 ## Overview
 ## Streamer Load Analysis
@@ -107,8 +116,10 @@ Format your response in clear sections using these exact headers:
 ## Recommendations
 
 Be specific — reference streamer names, brands, days, times, SGD numbers, and Mega/BAU day classification.
+Cross-reference the Streamer Availability data to flag any conflicts or unavailability on planned dates.
+Factor in any constraints or priorities mentioned in the Planning Notes.
 IMPORTANT: The historical data covers ALL completed streams from the earliest available date. Use this full picture — do not assume a combo is untested unless it genuinely has zero entries in the talent × brand combos table.
-Flag anything that looks risky based on historical data (bad timeslots, overloaded streamers, truly untested combos, Mega day misalignment).
+Flag anything that looks risky based on historical data (bad timeslots, overloaded streamers, truly untested combos, Mega day misalignment, availability conflicts).
 Keep each section tight — 3–5 bullet points max. Use bullet points (–) not numbers.`
 
   const userContent = `HISTORICAL TIMESLOT PERFORMANCE (by avg GMV):

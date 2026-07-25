@@ -8,13 +8,7 @@ export async function fetchStreams(forceRefresh = false) {
     if (cached) return cached
   }
 
-  const oauth2 = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-  )
-  oauth2.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN })
-
-  const sheets = google.sheets({ version: 'v4', auth: oauth2 })
+  const sheets = google.sheets({ version: 'v4', auth: getOAuth2() })
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
@@ -29,6 +23,46 @@ export async function fetchStreams(forceRefresh = false) {
 
   setCache(parsed)
   return parsed
+}
+
+function getOAuth2() {
+  const oauth2 = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+  )
+  oauth2.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN })
+  return oauth2
+}
+
+export async function fetchPlanningContext(): Promise<{ availability: string; notes: string }> {
+  const sheets = google.sheets({ version: 'v4', auth: getOAuth2() })
+  const sheetId = process.env.GOOGLE_SHEET_ID
+
+  const [availRes, notesRes] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: "'Streamer Availability'!A1:Z200",
+      valueRenderOption: 'FORMATTED_VALUE',
+    }).catch(() => null),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: "'Planning Notes'!A1:Z200",
+      valueRenderOption: 'FORMATTED_VALUE',
+    }).catch(() => null),
+  ])
+
+  const toText = (rows: string[][] | null | undefined): string => {
+    if (!rows?.length) return '(empty)'
+    return rows
+      .filter(r => r.some(c => c?.toString().trim()))
+      .map(r => r.map(c => c?.toString().trim() ?? '').join('\t'))
+      .join('\n')
+  }
+
+  return {
+    availability: toText(availRes?.data.values as string[][] | undefined),
+    notes: toText(notesRes?.data.values as string[][] | undefined),
+  }
 }
 
 export { clearCache, getCacheTimestamp }
