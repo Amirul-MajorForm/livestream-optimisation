@@ -1527,7 +1527,7 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                       const isMega = dayType === 'Mega'
                       return (
                         <div key={i} style={{
-                          minHeight: isMobile ? 60 : 80, borderRadius: 6, padding: '4px 5px',
+                          minHeight: isMobile ? 72 : 96, borderRadius: 6, padding: '4px 5px',
                           background: isMega ? 'rgba(245,158,11,0.08)' : SURFACE_RAISED,
                           border: `1px solid ${isMega ? 'rgba(245,158,11,0.3)' : BORDER}`,
                         }}>
@@ -1538,9 +1538,9 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                           {streams.map((s, si) => (
                             <div key={si} style={{
                               fontSize: '0.6rem', lineHeight: 1.3, marginBottom: 2, padding: '2px 3px', borderRadius: 3,
-                              background: `rgba(var(--ds-accent-raw),0.12)`, color: ACCENT, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-                            }} title={`${fmt12(s.startHour, s.startMinute)} ${s.talent}${s.brand ? ` · ${s.brand}` : ''}`}>
-                              {fmt12(s.startHour, s.startMinute)} {s.talent}
+                              background: `rgba(var(--ds-accent-raw),0.12)`, color: ACCENT, wordBreak: 'break-word',
+                            }} title={`${fmt12(s.startHour, s.startMinute)} ${s.talent}${s.brand ? ` · ${s.brand}` : ''}${s.platform ? ` · ${s.platform}` : ''}`}>
+                              <span style={{ fontWeight: 700 }}>{fmt12(s.startHour, s.startMinute)}</span>{' '}{s.talent}{s.brand ? ` · ${s.brand}` : ''}{s.platform ? ` · ${s.platform}` : ''}
                             </div>
                           ))}
                         </div>
