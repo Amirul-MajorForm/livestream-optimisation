@@ -57,14 +57,14 @@ const DARK_VARS = {
 } as React.CSSProperties
 
 const LIGHT_VARS = {
-  '--ds-bg': '#F5F5F2',
+  '--ds-bg': '#F7F7F7',
   '--ds-surface': '#FFFFFF',
-  '--ds-surface-raised': '#EEEEEA',
-  '--ds-border': '#E0E0DC',
-  '--ds-accent': '#4E7200',
+  '--ds-surface-raised': '#F0F0F0',
+  '--ds-border': '#E2E2E2',
+  '--ds-accent': '#2B3A55',
   '--ds-text-pri': '#111111',
-  '--ds-text-sec': '#666666',
-  '--ds-accent-raw': '78,114,0',
+  '--ds-text-sec': '#555555',
+  '--ds-accent-raw': '43,58,85',
 } as React.CSSProperties
 
 const fmt = (n: number) =>
