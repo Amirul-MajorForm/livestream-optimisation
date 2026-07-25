@@ -117,13 +117,12 @@ Format your response in clear sections using these EXACT headers (all six, in th
 ## Recommendations
 
 CRITICAL INSTRUCTION for ## Streamer Conflict Analysis:
-This section is the most important. Go through EVERY planned stream one by one and check whether the streamer's scheduled time slot matches their stated availability in the Streamer Availability data above.
-- A conflict exists when: the planned start/end time falls OUTSIDE the streamer's stated available window for that date, OR the streamer is marked unavailable for that date entirely.
-- Example conflict: streamer says available 6–8pm but is scheduled for 8–10pm → flag it.
-- Example conflict: streamer says unavailable on a date but is scheduled → flag it.
-- If a streamer has no availability entry for a planned date, flag it as "availability not confirmed".
-- List EVERY conflict found. Do not summarise or omit. Each bullet must name: streamer, date, their stated availability window, and the conflicting scheduled time.
-- If no conflicts found, state clearly "No conflicts detected."
+Go through every planned stream and check whether the scheduled time matches the streamer's stated availability. Only report actual or potential conflicts — do not list streams that are fine.
+- ACTUAL conflict: scheduled time falls outside the streamer's stated available window for that date (e.g. available 6–8pm but booked for 8–10pm), or streamer is marked unavailable on that date entirely.
+- POTENTIAL conflict: streamer has no availability entry at all for a planned date — flag as "availability unconfirmed".
+- Each flagged bullet must state: streamer name, date, their stated availability, and the conflicting scheduled time.
+- If there are zero conflicts or potential conflicts across all planned streams, write only: "– No conflicts detected."
+- Do NOT list or mention streams where the scheduled time aligns with availability.
 
 Be specific throughout — reference streamer names, brands, dates, times (12hr format), SGD numbers, and Mega/BAU classification.
 Factor in any constraints or priorities mentioned in the Planning Notes.
