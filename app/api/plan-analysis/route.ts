@@ -158,12 +158,18 @@ Analyse the planned streams against the historical data. Identify risks, imbalan
 
   const readable = new ReadableStream({
     async start(controller) {
-      for await (const chunk of stream) {
-        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-          controller.enqueue(new TextEncoder().encode(chunk.delta.text))
+      try {
+        for await (const chunk of stream) {
+          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+            controller.enqueue(new TextEncoder().encode(chunk.delta.text))
+          }
         }
+      } catch (err) {
+        console.error('plan-analysis stream error:', err)
+        controller.enqueue(new TextEncoder().encode('\n\n[Analysis error — please try again]'))
+      } finally {
+        controller.close()
       }
-      controller.close()
     },
   })
 
