@@ -102,7 +102,7 @@ KEY CONTEXT — DAY TYPES:
 - BAU days = all other days.
 Each planned stream is tagged with its dayType (Mega or BAU). Factor this heavily into your analysis — scheduling strong brands/streamers on BAU days when Mega dates are available is a missed opportunity, and vice versa (depleting a brand's best talent on BAU days before Mega dates).
 
-STREAMER AVAILABILITY (from live schedule sheet — each row shows a streamer's stated available time windows for specific dates):
+STREAMER AVAILABILITY (format: "StreamerName | Date (Day) | Status" — Status is either "Available" or "Blocked". Available = can stream. Blocked = unavailable. Each line is one streamer on one date. Cross-reference by matching streamer name AND date exactly.):
 ${planningContext.availability}
 
 PLANNING NOTES (internal notes from the planning team — treat these as ground truth context, constraints, and priorities):

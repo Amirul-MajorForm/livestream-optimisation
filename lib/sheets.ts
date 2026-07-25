@@ -53,6 +53,32 @@ export async function fetchPlanningContext(): Promise<{ availability: string; no
 
   const RETRACTED = /\b(retract|retracted|withdrawn|cancelled|canceled|void|n\/a)\b/i
 
+  const parseAvailability = (rows: string[][] | null | undefined): string => {
+    if (!rows?.length) return '(empty)'
+    // Row 0 = header: Date, Month, Day, Notes, Streamer1, Streamer2, ...
+    const header = rows[0].map(c => c?.toString().trim() ?? '')
+    const streamerCols: { name: string; col: number }[] = []
+    for (let i = 4; i < header.length; i++) {
+      if (header[i]) streamerCols.push({ name: header[i], col: i })
+    }
+    if (!streamerCols.length) return '(empty)'
+
+    const lines: string[] = []
+    for (const row of rows.slice(1)) {
+      const date = row[0]?.toString().trim()
+      const day = row[2]?.toString().trim()
+      if (!date) continue
+      const label = day ? `${date} (${day})` : date
+      for (const { name, col } of streamerCols) {
+        const status = row[col]?.toString().trim()
+        if (!status) continue
+        if (RETRACTED.test(status)) continue
+        lines.push(`${name} | ${label} | ${status}`)
+      }
+    }
+    return lines.length ? lines.join('\n') : '(empty)'
+  }
+
   const toText = (rows: string[][] | null | undefined): string => {
     if (!rows?.length) return '(empty)'
     return rows
@@ -63,7 +89,7 @@ export async function fetchPlanningContext(): Promise<{ availability: string; no
   }
 
   return {
-    availability: toText(availRes?.data.values as string[][] | undefined),
+    availability: parseAvailability(availRes?.data.values as string[][] | undefined),
     notes: toText(notesRes?.data.values as string[][] | undefined),
   }
 }
