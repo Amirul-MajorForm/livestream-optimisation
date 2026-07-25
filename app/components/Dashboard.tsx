@@ -1483,14 +1483,21 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                   ...cardStyle,
                   minWidth: isMobile ? 0 : 260, maxWidth: isMobile ? '100%' : 340, flexShrink: 0,
                   borderLeft: `3px solid ${
-                    s.title.toLowerCase().includes('risk') || s.title.toLowerCase().includes('flag')
+                    s.title.toLowerCase().includes('conflict')
                       ? '#F87171'
+                      : s.title.toLowerCase().includes('risk') || s.title.toLowerCase().includes('flag')
+                      ? '#FB923C'
                       : s.title.toLowerCase().includes('recommend')
                       ? ACCENT
                       : '#60A5FA'
                   }`,
                 }}>
-                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: ACCENT, marginBottom: 10, fontWeight: 700 }}>
+                  <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10, fontWeight: 700, color:
+                    s.title.toLowerCase().includes('conflict') ? '#F87171'
+                    : s.title.toLowerCase().includes('risk') || s.title.toLowerCase().includes('flag') ? '#FB923C'
+                    : s.title.toLowerCase().includes('recommend') ? ACCENT
+                    : '#60A5FA'
+                  }}>
                     {s.title}
                   </div>
                   <MdText text={s.body} style={{ fontSize: '0.82rem', color: TEXT_SEC, lineHeight: 1.8 }} />

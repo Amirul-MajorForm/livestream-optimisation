@@ -102,25 +102,33 @@ KEY CONTEXT — DAY TYPES:
 - BAU days = all other days.
 Each planned stream is tagged with its dayType (Mega or BAU). Factor this heavily into your analysis — scheduling strong brands/streamers on BAU days when Mega dates are available is a missed opportunity, and vice versa (depleting a brand's best talent on BAU days before Mega dates).
 
-STREAMER AVAILABILITY (from live schedule sheet — use this to flag conflicts, double-bookings, or streamers marked unavailable on planned dates):
+STREAMER AVAILABILITY (from live schedule sheet — each row shows a streamer's stated available time windows for specific dates):
 ${planningContext.availability}
 
 PLANNING NOTES (internal notes from the planning team — treat these as ground truth context, constraints, and priorities):
 ${planningContext.notes}
 
-Format your response in clear sections using these exact headers:
+Format your response in clear sections using these EXACT headers (all six, in this order):
 ## Overview
+## Streamer Conflict Analysis
 ## Streamer Load Analysis
 ## Brand Coverage Analysis
 ## Timeslot Risk Flags
 ## Recommendations
 
-Be specific — reference streamer names, brands, days, times, SGD numbers, and Mega/BAU day classification.
-Cross-reference the Streamer Availability data to flag any conflicts or unavailability on planned dates.
+CRITICAL INSTRUCTION for ## Streamer Conflict Analysis:
+This section is the most important. Go through EVERY planned stream one by one and check whether the streamer's scheduled time slot matches their stated availability in the Streamer Availability data above.
+- A conflict exists when: the planned start/end time falls OUTSIDE the streamer's stated available window for that date, OR the streamer is marked unavailable for that date entirely.
+- Example conflict: streamer says available 6–8pm but is scheduled for 8–10pm → flag it.
+- Example conflict: streamer says unavailable on a date but is scheduled → flag it.
+- If a streamer has no availability entry for a planned date, flag it as "availability not confirmed".
+- List EVERY conflict found. Do not summarise or omit. Each bullet must name: streamer, date, their stated availability window, and the conflicting scheduled time.
+- If no conflicts found, state clearly "No conflicts detected."
+
+Be specific throughout — reference streamer names, brands, dates, times (12hr format), SGD numbers, and Mega/BAU classification.
 Factor in any constraints or priorities mentioned in the Planning Notes.
-IMPORTANT: The historical data covers ALL completed streams from the earliest available date. Use this full picture — do not assume a combo is untested unless it genuinely has zero entries in the talent × brand combos table.
-Flag anything that looks risky based on historical data (bad timeslots, overloaded streamers, truly untested combos, Mega day misalignment, availability conflicts).
-Keep each section tight — 3–5 bullet points max. Use bullet points (–) not numbers.`
+IMPORTANT: The historical data covers ALL completed streams from the earliest available date. Do not assume a combo is untested unless it genuinely has zero entries in the talent × brand combos table.
+Keep non-conflict sections tight — 3–5 bullet points max. Use bullet points (–) not numbers.`
 
   const userContent = `HISTORICAL TIMESLOT PERFORMANCE (by avg GMV):
 ${JSON.stringify(timeslotSummary, null, 2)}
@@ -141,7 +149,7 @@ Analyse the planned streams against the historical data. Identify risks, imbalan
 
   const stream = await client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1500,
+    max_tokens: 2500,
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }],
   })
