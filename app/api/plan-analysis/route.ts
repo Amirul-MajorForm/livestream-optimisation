@@ -117,22 +117,26 @@ Format your response in clear sections using these EXACT headers (all six, in th
 ## Recommendations
 
 CRITICAL INSTRUCTION for ## Streamer Conflict Analysis:
-For each planned stream, check EXACTLY TWO sources for conflicts and nothing else:
+You MUST check EVERY planned stream — do not skip any streamer or date. Go through the PLANNED STREAMS list one by one, in order, and for each entry perform the following check:
 
-SOURCE A — Streamer Availability sheet (format: "StreamerName | Date | Available/Blocked"):
-- If the streamer's entry for that date is "Blocked" → CONFIRMED CONFLICT.
-- If the entry is "Available" with no time window → no conflict from this source.
-- If the entry is "Available" with a specific time window (e.g. "Available 6–8pm") → CONFIRMED CONFLICT only if the scheduled stream time falls entirely outside that window.
+For each planned stream, check EXACTLY TWO sources for conflicts:
 
-SOURCE B — Planning Notes time windows only:
-- Only flag if the notes state a hard time constraint for that streamer on that specific date (e.g. "available 6–8pm only on 20 Aug") AND the scheduled stream falls outside it.
-- DO NOT flag preferences, requests, or scheduling style notes (e.g. "prefers back-to-back slots", "minimise trips", "consolidate Saturdays") — these are NOT conflicts.
-- DO NOT flag warnings about future dates where no stream is currently planned.
-- DO NOT flag notes about another stream on the same day unless the times literally overlap.
+SOURCE A — Streamer Availability sheet (format: "StreamerName | Date | Status"):
+- Find the line where StreamerName matches the talent AND Date matches the stream date.
+- If status is "Blocked" → CONFIRMED CONFLICT.
+- If status is "Available" with no time window → no conflict from this source.
+- If status is "Available" with a specific time window (e.g. "Available 6–8pm") → CONFIRMED CONFLICT only if the scheduled stream time falls entirely outside that window.
+- If no line exists for that streamer+date → no conflict from this source.
+
+SOURCE B — Planning Notes hard time constraints only:
+- Only flag if the notes explicitly state a hard time window for that streamer on that specific date (e.g. "Esther available 6–8pm only on 20 Aug") AND the scheduled stream falls outside it.
+- DO NOT flag preferences, scheduling style notes, trip minimisation requests, or consolidation preferences — these are NOT conflicts.
+- DO NOT flag warnings about dates where no stream is currently scheduled.
+- DO NOT flag a separate non-overlapping stream on the same day as a conflict.
 
 OUTPUT RULES:
 - Each conflict bullet must start with **CONFIRMED CONFLICT** and state: streamer name, date, the stated available window or Blocked status, and the scheduled stream time.
-- If zero confirmed conflicts → write only: "– No conflicts detected."
+- If zero confirmed conflicts across ALL planned streams → write only: "– No conflicts detected."
 - NOTHING ELSE is allowed in this section. No caveats, no preferences, no future warnings, no "confirmed fine" entries.
 
 Be specific throughout — reference streamer names, brands, dates, times (12hr format), SGD numbers, and Mega/BAU classification.
