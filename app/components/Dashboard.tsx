@@ -767,10 +767,10 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
             <ComposedChart data={monthlyData} margin={{ top: 8, right: isMobile ? 4 : 48, bottom: 0, left: 0 }}>
               <XAxis dataKey="name" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} />
               <YAxis yAxisId="gmv" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} width={32} />
-              {!isMobile && <YAxis yAxisId="rate" orientation="right" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />}
+              <YAxis yAxisId="rate" orientation="right" tick={isMobile ? false : { fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} width={isMobile ? 0 : 48} />
               <Tooltip contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }} formatter={(v, name) => [fmtShort(Number(v)), name === 'totalGmv' ? 'Total GMV' : 'GMV / Hour']} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
               <Bar yAxisId="gmv" dataKey="totalGmv" name="totalGmv" fill={ACCENT} radius={[3,3,0,0]} opacity={0.85} />
-              <Line yAxisId={isMobile ? 'gmv' : 'rate'} dataKey="gmvPerHour" name="gmvPerHour" stroke="#60A5FA" strokeWidth={2} dot={{ fill: '#60A5FA', r: 2 }} />
+              <Line yAxisId="rate" dataKey="gmvPerHour" name="gmvPerHour" stroke="#60A5FA" strokeWidth={2} dot={{ fill: '#60A5FA', r: 2 }} />
             </ComposedChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
