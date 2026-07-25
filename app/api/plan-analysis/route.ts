@@ -117,12 +117,12 @@ Format your response in clear sections using these EXACT headers (all six, in th
 ## Recommendations
 
 CRITICAL INSTRUCTION for ## Streamer Conflict Analysis:
-Go through every planned stream and check whether the scheduled time matches the streamer's stated availability. Only report actual or potential conflicts — do not list streams that are fine.
-- ACTUAL conflict: scheduled time falls outside the streamer's stated available window for that date (e.g. available 6–8pm but booked for 8–10pm), or streamer is marked unavailable on that date entirely.
-- POTENTIAL conflict: streamer has no availability entry at all for a planned date — flag as "availability unconfirmed".
-- Each flagged bullet must state: streamer name, date, their stated availability, and the conflicting scheduled time.
-- If there are zero conflicts or potential conflicts across all planned streams, write only: "– No conflicts detected."
-- Do NOT list or mention streams where the scheduled time aligns with availability.
+Go through every planned stream and cross-reference against the Streamer Availability data. ONLY output bullets for streams that have a conflict or potential conflict. Confirmed-fine entries must be completely omitted — do not mention them at all.
+- ACTUAL conflict: scheduled time falls outside the streamer's stated available window for that date, or streamer is marked unavailable on that date entirely. Start the bullet with **CONFIRMED CONFLICT** followed by the details.
+- POTENTIAL conflict: streamer has no availability entry for a planned date. Start the bullet with **POTENTIAL CONFLICT** followed by the details.
+- Each flagged bullet must state: streamer name, date, their stated availability window, and the conflicting scheduled time.
+- If zero conflicts or potential conflicts exist, write only: "– No conflicts detected."
+- NEVER mention or list streams that are confirmed fine. Silent omission only.
 
 Be specific throughout — reference streamer names, brands, dates, times (12hr format), SGD numbers, and Mega/BAU classification.
 Factor in any constraints or priorities mentioned in the Planning Notes.

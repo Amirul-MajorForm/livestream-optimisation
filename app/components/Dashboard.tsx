@@ -1200,7 +1200,12 @@ function renderMd(text: string): React.ReactNode[] {
   const parts = text.split(/(\*\*[^*]+\*\*)/g)
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} style={{ color: TEXT_PRI, fontWeight: 600 }}>{part.slice(2, -2)}</strong>
+      const inner = part.slice(2, -2)
+      const upper = inner.toUpperCase()
+      const color = upper.includes('CONFIRMED CONFLICT') ? '#F87171'
+        : upper.includes('POTENTIAL CONFLICT') ? '#FB923C'
+        : TEXT_PRI
+      return <strong key={i} style={{ color, fontWeight: 700 }}>{inner}</strong>
     }
     return part
   })
