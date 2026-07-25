@@ -1279,6 +1279,11 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
   const [analysing, setAnalysing] = useState(false)
   const [analysed, setAnalysed] = useState(false)
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [scheduleView, setScheduleView] = useState<'table' | 'calendar'>('table')
+  const [calMonth, setCalMonth] = useState<Date>(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
 
   // Follow-up chat
   const [followUps, setFollowUps] = useState<ChatMsg[]>([])
@@ -1450,6 +1455,27 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
         </button>
         {scheduleOpen && (
           <div style={{ marginTop: 16 }}>
+            {/* View toggle */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {(['table', 'calendar'] as const).map(v => (
+                <button key={v} onClick={() => setScheduleView(v)} style={{
+                  fontSize: '0.72rem', padding: '4px 12px', borderRadius: 6, border: `1px solid ${scheduleView === v ? ACCENT : BORDER}`,
+                  background: scheduleView === v ? `rgba(var(--ds-accent-raw),0.12)` : 'transparent',
+                  color: scheduleView === v ? ACCENT : TEXT_SEC, cursor: 'pointer', fontWeight: scheduleView === v ? 700 : 400,
+                }}>{v === 'table' ? '☰ Table' : '▦ Calendar'}</button>
+              ))}
+              {scheduleView === 'calendar' && (
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))} style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT_SEC, cursor: 'pointer', padding: '2px 8px', fontSize: '0.8rem' }}>‹</button>
+                  <span style={{ fontSize: '0.75rem', color: TEXT_PRI, fontWeight: 600, minWidth: 90, textAlign: 'center' }}>
+                    {calMonth.toLocaleString('en-SG', { month: 'long', year: 'numeric' })}
+                  </span>
+                  <button onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))} style={{ background: 'none', border: `1px solid ${BORDER}`, borderRadius: 6, color: TEXT_SEC, cursor: 'pointer', padding: '2px 8px', fontSize: '0.8rem' }}>›</button>
+                </div>
+              )}
+            </div>
+
+            {scheduleView === 'table' ? (
             <Table
               headers={['Date', 'Type', 'Day', 'Time', 'Talent', 'Brand', 'Platform', 'Hours', 'Status']}
               rows={planned.map(s => {
@@ -1470,6 +1496,60 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                 <StatusBadge key="s" status={s.status} />,
               ]})}
             />
+            ) : (() => {
+              const year = calMonth.getFullYear()
+              const month = calMonth.getMonth()
+              const firstDay = new Date(year, month, 1).getDay()
+              const daysInMonth = new Date(year, month + 1, 0).getDate()
+              const streamsByDate: Record<string, Stream[]> = {}
+              planned.forEach(s => {
+                const d = new Date(s.date)
+                if (d.getFullYear() === year && d.getMonth() === month) {
+                  const key = d.getDate().toString()
+                  if (!streamsByDate[key]) streamsByDate[key] = []
+                  streamsByDate[key].push(s)
+                }
+              })
+              const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)]
+              while (cells.length % 7 !== 0) cells.push(null)
+              return (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, marginBottom: 4 }}>
+                    {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
+                      <div key={d} style={{ fontSize: '0.65rem', color: TEXT_SEC, textAlign: 'center', padding: '4px 0', fontWeight: 600 }}>{d}</div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+                    {cells.map((day, i) => {
+                      if (!day) return <div key={i} />
+                      const dayType = getDayType(`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`)
+                      const streams = streamsByDate[day.toString()] ?? []
+                      const isMega = dayType === 'Mega'
+                      return (
+                        <div key={i} style={{
+                          minHeight: isMobile ? 60 : 80, borderRadius: 6, padding: '4px 5px',
+                          background: isMega ? 'rgba(245,158,11,0.08)' : SURFACE_RAISED,
+                          border: `1px solid ${isMega ? 'rgba(245,158,11,0.3)' : BORDER}`,
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: isMega ? '#F59E0B' : TEXT_SEC }}>{day}</span>
+                            {isMega && <span style={{ fontSize: '0.55rem', color: '#F59E0B' }}>🔥</span>}
+                          </div>
+                          {streams.map((s, si) => (
+                            <div key={si} style={{
+                              fontSize: '0.6rem', lineHeight: 1.3, marginBottom: 2, padding: '2px 3px', borderRadius: 3,
+                              background: `rgba(var(--ds-accent-raw),0.12)`, color: ACCENT, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                            }} title={`${fmt12(s.startHour, s.startMinute)} ${s.talent}${s.brand ? ` · ${s.brand}` : ''}`}>
+                              {fmt12(s.startHour, s.startMinute)} {s.talent}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
       </div>
