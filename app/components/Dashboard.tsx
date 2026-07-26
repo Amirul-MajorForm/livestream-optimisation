@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, ComposedChart, Line,
@@ -1033,7 +1033,7 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
       const bauStreams = ss.filter(s => getDayType(s.date) === 'BAU')
       const megaAvg = megaStreams.length > 0 ? megaStreams.reduce((a, s) => a + s.totalGmv, 0) / megaStreams.length : 0
       const bauAvg = bauStreams.length > 0 ? bauStreams.reduce((a, s) => a + s.totalGmv, 0) / bauStreams.length : 0
-      return { brand, count: ss.length, tiktokGmv, shopeeGmv, totalGmv, avgGmvHour: totalHours > 0 ? totalGmv / totalHours : 0, topTalent, megaAvg, bauAvg }
+      return { brand, count: ss.length, tiktokGmv, shopeeGmv, totalGmv, avgGmvHour: totalHours > 0 ? totalGmv / totalHours : 0, topTalent, megaAvg, bauAvg, streams: ss }
     })
   }, [filtered])
 
@@ -1048,6 +1048,8 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
       return 0
     })
   }, [brandData, sortCol, sortDir])
+
+  const [expandedBrand, setExpandedBrand] = useState<string | null>(null)
 
   const toggleSort = (col: BrandSortCol) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -1085,22 +1087,67 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
               </tr>
             </thead>
             <tbody>
-              {sorted.map((b, ri) => (
-                <tr key={b.brand} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
-                >
-                  <td style={tdStyle}>{b.brand}</td>
-                  <td style={tdStyle}>{b.count}</td>
-                  <td style={tdStyle}>{b.tiktokGmv > 0 ? fmt(b.tiktokGmv) : '—'}</td>
-                  <td style={tdStyle}>{b.shopeeGmv > 0 ? fmt(b.shopeeGmv) : '—'}</td>
-                  <td style={tdStyle}>{fmt(b.totalGmv)}</td>
-                  <td style={tdStyle}>{fmt(b.avgGmvHour)}</td>
-                  <td style={{ ...tdStyle, color: b.megaAvg > 0 ? '#F59E0B' : TEXT_SEC }}>{b.megaAvg > 0 ? fmt(b.megaAvg) : '—'}</td>
-                  <td style={tdStyle}>{b.bauAvg > 0 ? fmt(b.bauAvg) : '—'}</td>
-                  <td style={tdStyle}>{b.topTalent}</td>
-                </tr>
-              ))}
+              {sorted.map((b, ri) => {
+                const isOpen = expandedBrand === b.brand
+                const rowBg = ri % 2 === 0 ? SURFACE : SURFACE_RAISED
+                return (
+                  <React.Fragment key={b.brand}>
+                    <tr style={{ background: rowBg, cursor: 'pointer' }}
+                      onClick={() => setExpandedBrand(isOpen ? null : b.brand)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
+                    >
+                      <td style={tdStyle}>
+                        <span style={{ marginRight: 6, fontSize: '0.65rem', color: TEXT_SEC, display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>▶</span>
+                        {b.brand}
+                      </td>
+                      <td style={tdStyle}>{b.count}</td>
+                      <td style={tdStyle}>{b.tiktokGmv > 0 ? fmt(b.tiktokGmv) : '—'}</td>
+                      <td style={tdStyle}>{b.shopeeGmv > 0 ? fmt(b.shopeeGmv) : '—'}</td>
+                      <td style={tdStyle}>{fmt(b.totalGmv)}</td>
+                      <td style={tdStyle}>{fmt(b.avgGmvHour)}</td>
+                      <td style={{ ...tdStyle, color: b.megaAvg > 0 ? '#F59E0B' : TEXT_SEC }}>{b.megaAvg > 0 ? fmt(b.megaAvg) : '—'}</td>
+                      <td style={tdStyle}>{b.bauAvg > 0 ? fmt(b.bauAvg) : '—'}</td>
+                      <td style={tdStyle}>{b.topTalent}</td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={9} style={{ padding: '0 0 8px 0', background: SURFACE_RAISED }}>
+                          <div style={{ padding: '8px 16px' }}>
+                            <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 8 }}>All {b.brand} Streams</div>
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
+                                <thead>
+                                  <tr>
+                                    {['Date', 'Day', 'Streamer', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Hours', 'Status'].map(h => (
+                                      <th key={h} style={{ ...thStyle, fontSize: '0.65rem' }}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {[...b.streams].sort((a, c) => new Date(c.date).getTime() - new Date(a.date).getTime()).map((s, si) => (
+                                    <tr key={si} style={{ background: si % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
+                                      <td style={tdStyle}>{new Date(s.date).toLocaleDateString('en-SG')}</td>
+                                      <td style={tdStyle}>{s.dayOfWeek}</td>
+                                      <td style={tdStyle}>{s.talent}</td>
+                                      <td style={tdStyle}>{s.platform ?? '—'}</td>
+                                      <td style={tdStyle}>{s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—'}</td>
+                                      <td style={tdStyle}>{s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—'}</td>
+                                      <td style={{ ...tdStyle, fontWeight: 600 }}>{fmt(s.totalGmv)}</td>
+                                      <td style={tdStyle}>{s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—'}</td>
+                                      <td style={tdStyle}><StatusBadge status={s.status} /></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -7,7 +7,7 @@ export async function POST(req: Request) {
 
   const stream = await client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
+    max_tokens: 3000,
     system: `You are a performance analyst for MajorForm, a Singapore digital marketing agency.
 You have access to livestream campaign data including streamers, brands, GMV, timeslots, and platforms.
 Answer questions about performance, trends, and patterns. Be concise. Format currency as SGD.
