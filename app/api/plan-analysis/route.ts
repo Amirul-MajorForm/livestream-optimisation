@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { fetchPlanningContext } from '@/lib/sheets'
 
 export async function POST(req: Request) {
+  try {
   const { planned, historical } = await req.json()
 
   const planningContext = await fetchPlanningContext().catch(() => ({ availability: '(unavailable)', notes: '(unavailable)' }))
@@ -178,9 +179,10 @@ Analyse the planned streams against the historical data. Identify risks, imbalan
             controller.enqueue(new TextEncoder().encode(chunk.delta.text))
           }
         }
-      } catch (err) {
-        console.error('plan-analysis stream error:', err)
-        controller.enqueue(new TextEncoder().encode('\n\n[Analysis error — please try again]'))
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('plan-analysis stream error:', msg)
+        controller.enqueue(new TextEncoder().encode(`\n\n[Analysis error: ${msg}]`))
       } finally {
         controller.close()
       }
@@ -190,4 +192,11 @@ Analyse the planned streams against the historical data. Identify risks, imbalan
   return new Response(readable, {
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
   })
+  } catch (err) {
+    console.error('plan-analysis route error:', err)
+    return new Response(
+      JSON.stringify({ error: String(err) }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
 }
