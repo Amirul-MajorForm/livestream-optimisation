@@ -510,7 +510,7 @@ export default function Dashboard() {
 
   const pageContent = (
     <>
-      {page === 'overview' && <OverviewPage streams={filtered} />}
+      {page === 'overview' && <OverviewPage streams={filtered} selectedPlatforms={selectedPlatforms} />}
       {page === 'streamers' && <StreamersPage streams={filtered} expanded={expandedTalent} setExpanded={setExpandedTalent} />}
       {page === 'brands' && <BrandsPage streams={filtered} accountFilter={selectedAccountTypes} setAccountFilter={setSelectedAccountTypes} />}
       {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
@@ -696,7 +696,7 @@ export default function Dashboard() {
 
 // ─── Overview ────────────────────────────────────────────────────────────────
 
-function OverviewPage({ streams }: { streams: Stream[] }) {
+function OverviewPage({ streams, selectedPlatforms }: { streams: Stream[]; selectedPlatforms: string[] }) {
   const isMobile = useMobile()
   const totalGmv = streams.reduce((a, s) => a + s.totalGmv, 0)
   const totalStreams = streams.length
@@ -723,12 +723,15 @@ function OverviewPage({ streams }: { streams: Stream[] }) {
   }, [streams])
 
   const monthlyData = useMemo(() => {
+    const onlyTiktok = selectedPlatforms.length === 1 && selectedPlatforms[0].toLowerCase() === 'tiktok'
+    const onlyShopee = selectedPlatforms.length === 1 && selectedPlatforms[0].toLowerCase() === 'shopee'
     const m: Record<string, { totalGmv: number; hours: number; count: number }> = {}
     streams.forEach(s => {
       const d = new Date(s.date)
       const key = `${d.toLocaleString('en-SG', { month: 'short' })} ${d.getFullYear()}`
       if (!m[key]) m[key] = { totalGmv: 0, hours: 0, count: 0 }
-      m[key].totalGmv += s.totalGmv
+      const gmv = onlyTiktok ? s.tiktokGmv : onlyShopee ? s.shopeeGmv : s.totalGmv
+      m[key].totalGmv += gmv
       m[key].hours += s.hours
       m[key].count++
     })
@@ -1110,41 +1113,89 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
                       <td style={tdStyle}>{b.bauAvg > 0 ? fmt(b.bauAvg) : '—'}</td>
                       <td style={tdStyle}>{b.topTalent}</td>
                     </tr>
-                    {isOpen && (
+                    {isOpen && (() => {
+                      const sortedStreams = [...b.streams].sort((a, c) => new Date(c.date).getTime() - new Date(a.date).getTime())
+                      const monthlyBreakdown = Object.entries(
+                        b.streams.reduce((acc, s) => {
+                          const d = new Date(s.date)
+                          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+                          const label = d.toLocaleString('en-SG', { month: 'short', year: 'numeric' })
+                          if (!acc[key]) acc[key] = { label, totalGmv: 0, tiktokGmv: 0, shopeeGmv: 0, count: 0 }
+                          acc[key].totalGmv += s.totalGmv
+                          acc[key].tiktokGmv += s.tiktokGmv
+                          acc[key].shopeeGmv += s.shopeeGmv
+                          acc[key].count++
+                          return acc
+                        }, {} as Record<string, { label: string; totalGmv: number; tiktokGmv: number; shopeeGmv: number; count: number }>)
+                      ).sort(([a], [c]) => a.localeCompare(c))
+                      return (
                       <tr>
                         <td colSpan={9} style={{ padding: '0 0 8px 0', background: SURFACE_RAISED }}>
-                          <div style={{ padding: '8px 16px' }}>
-                            <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 8 }}>All {b.brand} Streams</div>
-                            <div style={{ overflowX: 'auto' }}>
-                              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
-                                <thead>
-                                  <tr>
-                                    {['Date', 'Day', 'Streamer', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Hours', 'Status'].map(h => (
-                                      <th key={h} style={{ ...thStyle, fontSize: '0.65rem' }}>{h}</th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {[...b.streams].sort((a, c) => new Date(c.date).getTime() - new Date(a.date).getTime()).map((s, si) => (
-                                    <tr key={si} style={{ background: si % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
-                                      <td style={tdStyle}>{new Date(s.date).toLocaleDateString('en-SG')}</td>
-                                      <td style={tdStyle}>{s.dayOfWeek}</td>
-                                      <td style={tdStyle}>{s.talent}</td>
-                                      <td style={tdStyle}>{s.platform ?? '—'}</td>
-                                      <td style={tdStyle}>{s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—'}</td>
-                                      <td style={tdStyle}>{s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—'}</td>
-                                      <td style={{ ...tdStyle, fontWeight: 600 }}>{fmt(s.totalGmv)}</td>
-                                      <td style={tdStyle}>{s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—'}</td>
-                                      <td style={tdStyle}><StatusBadge status={s.status} /></td>
+                          <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                            {/* Monthly breakdown */}
+                            <div>
+                              <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 8 }}>Monthly Breakdown</div>
+                              <div style={{ overflowX: 'auto' }}>
+                                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
+                                  <thead>
+                                    <tr>
+                                      {['Month', 'Streams', 'TikTok GMV', 'Shopee GMV', 'Total GMV'].map(h => (
+                                        <th key={h} style={{ ...thStyle, fontSize: '0.65rem' }}>{h}</th>
+                                      ))}
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody>
+                                    {monthlyBreakdown.map(([, mv], mi) => (
+                                      <tr key={mi} style={{ background: mi % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
+                                        <td style={{ ...tdStyle, fontWeight: 600 }}>{mv.label}</td>
+                                        <td style={tdStyle}>{mv.count}</td>
+                                        <td style={tdStyle}>{mv.tiktokGmv > 0 ? fmt(mv.tiktokGmv) : '—'}</td>
+                                        <td style={tdStyle}>{mv.shopeeGmv > 0 ? fmt(mv.shopeeGmv) : '—'}</td>
+                                        <td style={{ ...tdStyle, fontWeight: 600, color: ACCENT }}>{fmt(mv.totalGmv)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
+
+                            {/* All streams */}
+                            <div>
+                              <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 8 }}>All Streams</div>
+                              <div style={{ overflowX: 'auto' }}>
+                                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
+                                  <thead>
+                                    <tr>
+                                      {['Date', 'Day', 'Streamer', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Hours', 'Status'].map(h => (
+                                        <th key={h} style={{ ...thStyle, fontSize: '0.65rem' }}>{h}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {sortedStreams.map((s, si) => (
+                                      <tr key={si} style={{ background: si % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
+                                        <td style={tdStyle}>{new Date(s.date).toLocaleDateString('en-SG')}</td>
+                                        <td style={tdStyle}>{s.dayOfWeek}</td>
+                                        <td style={tdStyle}>{s.talent}</td>
+                                        <td style={tdStyle}>{s.platform ?? '—'}</td>
+                                        <td style={tdStyle}>{s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—'}</td>
+                                        <td style={tdStyle}>{s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—'}</td>
+                                        <td style={{ ...tdStyle, fontWeight: 600 }}>{fmt(s.totalGmv)}</td>
+                                        <td style={tdStyle}>{s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—'}</td>
+                                        <td style={tdStyle}><StatusBadge status={s.status} /></td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
                           </div>
                         </td>
                       </tr>
-                    )}
+                      )
+                    })()}
                   </React.Fragment>
                 )
               })}
