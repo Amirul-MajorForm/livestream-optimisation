@@ -1155,52 +1155,38 @@ function BrandsPage({ streams, accountFilter, setAccountFilter }: { streams: Str
 
                             {/* Mega vs BAU × Platform */}
                             <div>
-                              <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 8 }}>🔥 Mega vs BAU — Platform Breakdown</div>
+                              <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 8 }}>🔥 Mega vs BAU — TikTok vs Shopee</div>
                               <div style={{ overflowX: 'auto' }}>
                                 <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
                                   <thead>
                                     <tr>
-                                      <th style={{ ...thStyle, fontSize: '0.65rem' }}>Day Type</th>
-                                      <th style={{ ...thStyle, fontSize: '0.65rem' }}>Platform</th>
-                                      <th style={{ ...thStyle, fontSize: '0.65rem' }}>Streams</th>
-                                      <th style={{ ...thStyle, fontSize: '0.65rem' }}>TikTok GMV</th>
-                                      <th style={{ ...thStyle, fontSize: '0.65rem' }}>Shopee GMV</th>
-                                      <th style={{ ...thStyle, fontSize: '0.65rem' }}>Total GMV</th>
-                                      <th style={{ ...thStyle, fontSize: '0.65rem' }}>Avg GMV/Stream</th>
+                                      <th style={{ ...thStyle, fontSize: '0.65rem' }} rowSpan={2}>Day Type</th>
+                                      <th style={{ ...thStyle, fontSize: '0.65rem', color: TIKTOK_COLOR, borderBottom: `2px solid ${TIKTOK_COLOR}` }} colSpan={3}>TikTok</th>
+                                      <th style={{ ...thStyle, fontSize: '0.65rem', color: SHOPEE_COLOR, borderBottom: `2px solid ${SHOPEE_COLOR}` }} colSpan={3}>Shopee</th>
+                                    </tr>
+                                    <tr>
+                                      {['Streams', 'Total GMV', 'Avg/Stream', 'Streams', 'Total GMV', 'Avg/Stream'].map((h, i) => (
+                                        <th key={i} style={{ ...thStyle, fontSize: '0.6rem' }}>{h}</th>
+                                      ))}
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {(['Mega', 'BAU'] as const).map(dt => {
-                                      const dtTotal = dayTypeTotal(dt)
+                                    {(['Mega', 'BAU'] as const).map((dt, ri) => {
                                       const dtColor = dt === 'Mega' ? '#F59E0B' : TEXT_SEC
-                                      const rows = allPlats.map(plat => ({ plat, ...(perfMap[dt][plat] ?? { count: 0, tiktokGmv: 0, shopeeGmv: 0, totalGmv: 0 }) }))
+                                      const tiktokStreams = b.streams.filter(s => getDayType(s.date) === dt && (s.platform ?? '').toLowerCase().includes('tiktok'))
+                                      const shopeeStreams = b.streams.filter(s => getDayType(s.date) === dt && (s.platform ?? '').toLowerCase().includes('shopee'))
+                                      const tGmv = tiktokStreams.reduce((a, s) => a + s.tiktokGmv, 0)
+                                      const sGmv = shopeeStreams.reduce((a, s) => a + s.shopeeGmv, 0)
                                       return (
-                                        <React.Fragment key={dt}>
-                                          {rows.map((r, ri) => (
-                                            <tr key={r.plat} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
-                                              {ri === 0 && (
-                                                <td rowSpan={rows.length + 1} style={{ ...tdStyle, fontWeight: 700, color: dtColor, verticalAlign: 'top', borderRight: `2px solid ${BORDER}` }}>
-                                                  {dt === 'Mega' ? '🔥 Mega' : '📅 BAU'}
-                                                </td>
-                                              )}
-                                              <td style={tdStyle}>{r.plat}</td>
-                                              <td style={tdStyle}>{r.count || '—'}</td>
-                                              <td style={tdStyle}>{r.tiktokGmv > 0 ? fmt(r.tiktokGmv) : '—'}</td>
-                                              <td style={tdStyle}>{r.shopeeGmv > 0 ? fmt(r.shopeeGmv) : '—'}</td>
-                                              <td style={tdStyle}>{r.totalGmv > 0 ? fmt(r.totalGmv) : '—'}</td>
-                                              <td style={tdStyle}>{r.count > 0 ? fmt(r.totalGmv / r.count) : '—'}</td>
-                                            </tr>
-                                          ))}
-                                          {/* subtotal row */}
-                                          <tr style={{ background: dt === 'Mega' ? 'rgba(245,158,11,0.08)' : `rgba(var(--ds-accent-raw),0.06)`, fontWeight: 600 }}>
-                                            <td style={{ ...tdStyle, color: dtColor, fontWeight: 700 }}>Total</td>
-                                            <td style={tdStyle}>{dtTotal.count}</td>
-                                            <td style={tdStyle}>{dtTotal.tiktokGmv > 0 ? fmt(dtTotal.tiktokGmv) : '—'}</td>
-                                            <td style={tdStyle}>{dtTotal.shopeeGmv > 0 ? fmt(dtTotal.shopeeGmv) : '—'}</td>
-                                            <td style={{ ...tdStyle, color: dtColor, fontWeight: 700 }}>{fmt(dtTotal.totalGmv)}</td>
-                                            <td style={{ ...tdStyle, color: dtColor }}>{dtTotal.count > 0 ? fmt(dtTotal.totalGmv / dtTotal.count) : '—'}</td>
-                                          </tr>
-                                        </React.Fragment>
+                                        <tr key={dt} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
+                                          <td style={{ ...tdStyle, fontWeight: 700, color: dtColor }}>{dt === 'Mega' ? '🔥 Mega' : '📅 BAU'}</td>
+                                          <td style={tdStyle}>{tiktokStreams.length || '—'}</td>
+                                          <td style={{ ...tdStyle, color: tiktokStreams.length ? TIKTOK_COLOR : TEXT_SEC, fontWeight: 600 }}>{tGmv > 0 ? fmt(tGmv) : '—'}</td>
+                                          <td style={tdStyle}>{tiktokStreams.length > 0 ? fmt(tGmv / tiktokStreams.length) : '—'}</td>
+                                          <td style={tdStyle}>{shopeeStreams.length || '—'}</td>
+                                          <td style={{ ...tdStyle, color: shopeeStreams.length ? SHOPEE_COLOR : TEXT_SEC, fontWeight: 600 }}>{sGmv > 0 ? fmt(sGmv) : '—'}</td>
+                                          <td style={tdStyle}>{shopeeStreams.length > 0 ? fmt(sGmv / shopeeStreams.length) : '—'}</td>
+                                        </tr>
                                       )
                                     })}
                                   </tbody>
