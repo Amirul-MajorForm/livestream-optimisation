@@ -1422,6 +1422,80 @@ function MegaPage({ streams }: { streams: Stream[] }) {
         />
       </div>
 
+      {/* Heatmaps: D vs D-1 side by side */}
+      {(() => {
+        const buildHeatmap = (pool: Stream[]) => {
+          const cells: Record<string, Record<string, number[]>> = {}
+          DAY_ORDER.forEach(d => { cells[d] = {}; TIME_BUCKETS.forEach(b => { cells[d][b] = [] }) })
+          pool.forEach(s => {
+            const b = getBucket(s.startHour)
+            if (!b || !DAY_ORDER.includes(s.dayOfWeek)) return
+            cells[s.dayOfWeek][b].push(s.totalGmv)
+          })
+          return cells
+        }
+        const dHeat = buildHeatmap(dStreams)
+        const d1Heat = buildHeatmap(dMinus1Streams)
+        // shared scale across both heatmaps
+        const allVals = [...dStreams, ...dMinus1Streams].flatMap(s => {
+          const b = getBucket(s.startHour)
+          return b ? [s.totalGmv] : []
+        })
+        const maxV = allVals.length > 0 ? Math.max(...allVals) : 1
+        const minV = allVals.length > 0 ? Math.min(...allVals) : 0
+
+        const HeatGrid = ({ cells, title, color }: { cells: typeof dHeat; title: string; color: string }) => (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 340, fontSize: '0.65rem' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thStyle, fontSize: '0.6rem', padding: '6px 8px', width: 32 }}></th>
+                    {TIME_BUCKETS.map(b => <th key={b} style={{ ...thStyle, fontSize: '0.58rem', padding: '6px 4px', textAlign: 'center' }}>{b}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {DAY_ORDER.map(day => (
+                    <tr key={day}>
+                      <td style={{ ...tdStyle, color: TEXT_PRI, fontWeight: 600, fontSize: '0.72rem', padding: '6px 8px' }}>{day}</td>
+                      {TIME_BUCKETS.map(bucket => {
+                        const vals = cells[day][bucket]
+                        const avg = vals.length > 0 ? vals.reduce((a, v) => a + v, 0) / vals.length : 0
+                        const ratio = avg > 0 && maxV > minV ? (avg - minV) / (maxV - minV) : 0
+                        const bg = heatColor(ratio)
+                        const textDark = ratio > 0.5
+                        return (
+                          <td key={bucket} style={{
+                            ...tdStyle, textAlign: 'center', padding: '5px 4px',
+                            background: bg,
+                            color: avg > 0 ? (textDark ? '#0A0A0A' : '#F0F0F0') : TEXT_SEC,
+                            fontSize: '0.65rem', fontWeight: avg > 0 ? 600 : 400,
+                          }}>
+                            {avg > 0 ? fmtShort(avg) : '—'}
+                            {vals.length > 0 && <div style={{ fontSize: '0.55rem', opacity: 0.75 }}>{vals.length}x</div>}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+
+        return (
+          <div style={cardStyle}>
+            <SectionLabel>Heatmap — Avg GMV by Day &amp; Time</SectionLabel>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 24 : 32 }}>
+              <HeatGrid cells={dHeat} title="🔥 D — Mega Day" color="#F59E0B" />
+              <HeatGrid cells={d1Heat} title="🔥 D-1 — Eve" color="#FBBF24" />
+            </div>
+          </div>
+        )
+      })()}
+
       {/* D vs D-1 × Platform */}
       <div style={cardStyle}>
         <SectionLabel>D vs D-1 — TikTok vs Shopee</SectionLabel>
