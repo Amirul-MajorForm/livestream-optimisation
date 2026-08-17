@@ -1487,7 +1487,10 @@ function MegaPage({ streams }: { streams: Stream[] }) {
 
         return (
           <div style={cardStyle}>
-            <SectionLabel>Heatmap — Avg GMV by Day &amp; Time</SectionLabel>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>Heatmap — GMV / Session by Day &amp; Time</div>
+              <div style={{ fontSize: '0.68rem', color: TEXT_SEC, fontStyle: 'italic' }}>Each cell shows avg GMV per stream session · count shown below</div>
+            </div>
             <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 24 : 32 }}>
               <HeatGrid cells={dHeat} title="🔥 D — Mega Day" color="#F59E0B" />
               <HeatGrid cells={d1Heat} title="🔥 D-1 — Eve" color="#FBBF24" />
