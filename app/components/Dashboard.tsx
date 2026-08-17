@@ -988,26 +988,96 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
                     <td style={tdStyle}>{t.topBrand}</td>
                     <td style={tdStyle}><span style={{ color: TEXT_SEC, fontSize: '0.75rem' }}>{expanded === t.talent ? '▲' : '▼'}</span></td>
                   </tr>
-                  {expanded === t.talent && (
+                  {expanded === t.talent && (() => {
+                    const monthlyMap = t.streams.reduce((acc, s) => {
+                      const d = new Date(s.date)
+                      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+                      const label = d.toLocaleString('en-SG', { month: 'short', year: 'numeric' })
+                      if (!acc[key]) acc[key] = { label, streams: [], totalGmv: 0, tiktokGmv: 0, shopeeGmv: 0, hours: 0 }
+                      acc[key].streams.push(s)
+                      acc[key].totalGmv += s.totalGmv
+                      acc[key].tiktokGmv += s.tiktokGmv
+                      acc[key].shopeeGmv += s.shopeeGmv
+                      acc[key].hours += s.hours
+                      return acc
+                    }, {} as Record<string, { label: string; streams: Stream[]; totalGmv: number; tiktokGmv: number; shopeeGmv: number; hours: number }>)
+                    const months = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b))
+                    const sortedStreams = [...t.streams].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    return (
                     <tr key={`${t.talent}-exp`}>
-                      <td colSpan={7} style={{ padding: '0 0 0 32px', background: '#0D0D0D' }}>
-                        <Table
-                          headers={['Date', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Hours', 'Status']}
-                          rows={[...t.streams].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(s => [
-                            new Date(s.date).toLocaleDateString('en-SG'),
-                            s.brand ?? '—',
-                            s.platform ?? '—',
-                            s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—',
-                            s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—',
-                            fmt(s.totalGmv),
-                            s.hours.toFixed(1),
-                            <StatusBadge key="s" status={s.status} />,
-                          ])}
-                          compact
-                        />
+                      <td colSpan={7} style={{ padding: '0', background: SURFACE_RAISED }}>
+                        <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                          {/* Monthly breakdown */}
+                          <div>
+                            <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 6 }}>Monthly Breakdown</div>
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.75rem' }}>
+                                <thead>
+                                  <tr>
+                                    {['Month', 'Streams', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Avg/Stream', 'Avg GMV/Hr'].map(h => (
+                                      <th key={h} style={{ ...thStyle, fontSize: '0.62rem' }}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {months.map(([, mv], mi) => (
+                                    <tr key={mi} style={{ background: mi % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
+                                      <td style={{ ...tdStyle, fontWeight: 600 }}>{mv.label}</td>
+                                      <td style={tdStyle}>{mv.streams.length}</td>
+                                      <td style={{ ...tdStyle, color: mv.tiktokGmv > 0 ? TIKTOK_COLOR : TEXT_SEC }}>{mv.tiktokGmv > 0 ? fmt(mv.tiktokGmv) : '—'}</td>
+                                      <td style={{ ...tdStyle, color: mv.shopeeGmv > 0 ? SHOPEE_COLOR : TEXT_SEC }}>{mv.shopeeGmv > 0 ? fmt(mv.shopeeGmv) : '—'}</td>
+                                      <td style={{ ...tdStyle, fontWeight: 600, color: ACCENT }}>{fmt(mv.totalGmv)}</td>
+                                      <td style={tdStyle}>{fmt(mv.totalGmv / mv.streams.length)}</td>
+                                      <td style={tdStyle}>{mv.hours > 0 ? fmt(mv.totalGmv / mv.hours) : '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* All streams */}
+                          <div>
+                            <div style={{ fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC, marginBottom: 6 }}>All Streams ({sortedStreams.length})</div>
+                            <div style={{ overflowX: 'auto' }}>
+                              <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.75rem' }}>
+                                <thead>
+                                  <tr>
+                                    {['Date', 'Type', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Hours', 'Status'].map(h => (
+                                      <th key={h} style={{ ...thStyle, fontSize: '0.62rem' }}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {sortedStreams.map((s, si) => {
+                                    const sub = getMegaSubtype(s.date)
+                                    const typeLabel = sub === 'D' ? '🔥 D' : sub === 'D-1' ? '🔥 D-1' : '📅 BAU'
+                                    const typeColor = sub === 'D' ? '#F59E0B' : sub === 'D-1' ? '#FBBF24' : TEXT_SEC
+                                    return (
+                                      <tr key={si} style={{ background: si % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
+                                        <td style={tdStyle}>{new Date(s.date).toLocaleDateString('en-SG')}</td>
+                                        <td style={{ ...tdStyle, fontWeight: 700, color: typeColor, whiteSpace: 'nowrap' }}>{typeLabel}</td>
+                                        <td style={tdStyle}>{s.brand ?? '—'}</td>
+                                        <td style={tdStyle}>{s.platform ?? '—'}</td>
+                                        <td style={{ ...tdStyle, color: s.tiktokGmv > 0 ? TIKTOK_COLOR : TEXT_SEC }}>{s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—'}</td>
+                                        <td style={{ ...tdStyle, color: s.shopeeGmv > 0 ? SHOPEE_COLOR : TEXT_SEC }}>{s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—'}</td>
+                                        <td style={{ ...tdStyle, fontWeight: 600 }}>{fmt(s.totalGmv)}</td>
+                                        <td style={tdStyle}>{s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—'}</td>
+                                        <td style={tdStyle}><StatusBadge status={s.status} /></td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                        </div>
                       </td>
                     </tr>
-                  )}
+                    )
+                  })()}
                 </>
               ))}
             </tbody>
