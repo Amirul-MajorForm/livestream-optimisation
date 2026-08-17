@@ -1422,43 +1422,49 @@ function MegaPage({ streams }: { streams: Stream[] }) {
         />
       </div>
 
-      {/* Heatmaps: D vs D-1 side by side */}
+      {/* Heatmaps: 4 grids — D/D-1 × TikTok/Shopee */}
       {(() => {
-        const buildHeatmap = (pool: Stream[]) => {
+        // build heatmap using platform-specific GMV
+        const buildHeatmap = (pool: Stream[], gmvKey: 'tiktokGmv' | 'shopeeGmv') => {
           const cells: Record<string, Record<string, number[]>> = {}
           DAY_ORDER.forEach(d => { cells[d] = {}; TIME_BUCKETS.forEach(b => { cells[d][b] = [] }) })
           pool.forEach(s => {
             const b = getBucket(s.startHour)
             if (!b || !DAY_ORDER.includes(s.dayOfWeek)) return
-            cells[s.dayOfWeek][b].push(s.totalGmv)
+            const val = s[gmvKey]
+            if (val > 0) cells[s.dayOfWeek][b].push(val)
           })
           return cells
         }
-        const dHeat = buildHeatmap(dStreams)
-        const d1Heat = buildHeatmap(dMinus1Streams)
-        // shared scale across both heatmaps
-        const allVals = [...dStreams, ...dMinus1Streams].flatMap(s => {
-          const b = getBucket(s.startHour)
-          return b ? [s.totalGmv] : []
-        })
+
+        const dTiktok   = buildHeatmap(dStreams.filter(s => (s.platform ?? '').toLowerCase().includes('tiktok')), 'tiktokGmv')
+        const dShopee   = buildHeatmap(dStreams.filter(s => (s.platform ?? '').toLowerCase().includes('shopee')), 'shopeeGmv')
+        const d1Tiktok  = buildHeatmap(dMinus1Streams.filter(s => (s.platform ?? '').toLowerCase().includes('tiktok')), 'tiktokGmv')
+        const d1Shopee  = buildHeatmap(dMinus1Streams.filter(s => (s.platform ?? '').toLowerCase().includes('shopee')), 'shopeeGmv')
+
+        // shared scale across all four grids
+        const allCells = [dTiktok, dShopee, d1Tiktok, d1Shopee]
+        const allVals = allCells.flatMap(hm =>
+          DAY_ORDER.flatMap(d => TIME_BUCKETS.flatMap(b => hm[d][b]))
+        )
         const maxV = allVals.length > 0 ? Math.max(...allVals) : 1
         const minV = allVals.length > 0 ? Math.min(...allVals) : 0
 
-        const HeatGrid = ({ cells, title, color }: { cells: typeof dHeat; title: string; color: string }) => (
+        const HeatGrid = ({ cells, title, accentColor }: { cells: typeof dTiktok; title: string; accentColor: string }) => (
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
+            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: accentColor, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 340, fontSize: '0.65rem' }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 300, fontSize: '0.63rem' }}>
                 <thead>
                   <tr>
-                    <th style={{ ...thStyle, fontSize: '0.6rem', padding: '6px 8px', width: 32 }}></th>
-                    {TIME_BUCKETS.map(b => <th key={b} style={{ ...thStyle, fontSize: '0.58rem', padding: '6px 4px', textAlign: 'center' }}>{b}</th>)}
+                    <th style={{ ...thStyle, fontSize: '0.58rem', padding: '5px 6px', width: 28 }}></th>
+                    {TIME_BUCKETS.map(b => <th key={b} style={{ ...thStyle, fontSize: '0.55rem', padding: '5px 3px', textAlign: 'center' }}>{b}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {DAY_ORDER.map(day => (
                     <tr key={day}>
-                      <td style={{ ...tdStyle, color: TEXT_PRI, fontWeight: 600, fontSize: '0.72rem', padding: '6px 8px' }}>{day}</td>
+                      <td style={{ ...tdStyle, color: TEXT_PRI, fontWeight: 600, fontSize: '0.68rem', padding: '5px 6px' }}>{day}</td>
                       {TIME_BUCKETS.map(bucket => {
                         const vals = cells[day][bucket]
                         const avg = vals.length > 0 ? vals.reduce((a, v) => a + v, 0) / vals.length : 0
@@ -1467,13 +1473,13 @@ function MegaPage({ streams }: { streams: Stream[] }) {
                         const textDark = ratio > 0.5
                         return (
                           <td key={bucket} style={{
-                            ...tdStyle, textAlign: 'center', padding: '5px 4px',
+                            ...tdStyle, textAlign: 'center', padding: '4px 3px',
                             background: bg,
                             color: avg > 0 ? (textDark ? '#0A0A0A' : '#F0F0F0') : TEXT_SEC,
-                            fontSize: '0.65rem', fontWeight: avg > 0 ? 600 : 400,
+                            fontSize: '0.62rem', fontWeight: avg > 0 ? 600 : 400,
                           }}>
                             {avg > 0 ? fmtShort(avg) : '—'}
-                            {vals.length > 0 && <div style={{ fontSize: '0.55rem', opacity: 0.75 }}>{vals.length}x</div>}
+                            {vals.length > 0 && <div style={{ fontSize: '0.52rem', opacity: 0.75 }}>{vals.length}x</div>}
                           </td>
                         )
                       })}
@@ -1489,11 +1495,27 @@ function MegaPage({ streams }: { streams: Stream[] }) {
           <div style={cardStyle}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 6 }}>
               <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>Heatmap — GMV / Session by Day &amp; Time</div>
-              <div style={{ fontSize: '0.68rem', color: TEXT_SEC, fontStyle: 'italic' }}>Each cell shows avg GMV per stream session · count shown below</div>
+              <div style={{ fontSize: '0.68rem', color: TEXT_SEC, fontStyle: 'italic' }}>Avg GMV per stream session · session count shown below each value</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 24 : 32 }}>
-              <HeatGrid cells={dHeat} title="🔥 D — Mega Day" color="#F59E0B" />
-              <HeatGrid cells={d1Heat} title="🔥 D-1 — Eve" color="#FBBF24" />
+            {/* TikTok row */}
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: TIKTOK_COLOR, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 10, height: 3, background: TIKTOK_COLOR, display: 'inline-block', borderRadius: 2 }} /> TikTok
+              </div>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 20 : 24 }}>
+                <HeatGrid cells={dTiktok}  title="🔥 D — Mega Day"  accentColor="#F59E0B" />
+                <HeatGrid cells={d1Tiktok} title="🔥 D-1 — Eve"     accentColor="#FBBF24" />
+              </div>
+            </div>
+            {/* Shopee row */}
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: SHOPEE_COLOR, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 10, height: 3, background: SHOPEE_COLOR, display: 'inline-block', borderRadius: 2 }} /> Shopee
+              </div>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 20 : 24 }}>
+                <HeatGrid cells={dShopee}  title="🔥 D — Mega Day"  accentColor="#F59E0B" />
+                <HeatGrid cells={d1Shopee} title="🔥 D-1 — Eve"     accentColor="#FBBF24" />
+              </div>
             </div>
           </div>
         )
@@ -1605,77 +1627,96 @@ function MegaPage({ streams }: { streams: Stream[] }) {
         </div>
       </div>
 
-      {/* Mega dates ranked */}
-      <div style={cardStyle}>
-        <SectionLabel>Mega Dates Ranked by GMV</SectionLabel>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
-            <thead>
-              <tr>
-                {['Date', 'Type', 'Streams', 'TikTok GMV', 'Shopee GMV', 'Total GMV'].map(h => (
-                  <th key={h} style={thStyle}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {megaDates.map((row, ri) => (
-                <tr key={ri} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
-                >
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>{new Date(row.date).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                  <td style={{ ...tdStyle, fontWeight: 700, color: subColor(row.sub) }}>{subLabel(row.sub)}</td>
-                  <td style={tdStyle}>{row.count}</td>
-                  <td style={{ ...tdStyle, color: row.tiktokGmv > 0 ? TIKTOK_COLOR : TEXT_SEC }}>{row.tiktokGmv > 0 ? fmt(row.tiktokGmv) : '—'}</td>
-                  <td style={{ ...tdStyle, color: row.shopeeGmv > 0 ? SHOPEE_COLOR : TEXT_SEC }}>{row.shopeeGmv > 0 ? fmt(row.shopeeGmv) : '—'}</td>
-                  <td style={{ ...tdStyle, fontWeight: 700, color: ACCENT }}>{fmt(row.totalGmv)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Mega dates ranked — collapsible */}
+      {(() => {
+        const [open, setOpen] = useState(false)
+        return (
+          <div style={cardStyle}>
+            <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>Mega Dates Ranked by GMV ({megaDates.length})</span>
+              <span style={{ color: TEXT_SEC, fontSize: '0.75rem', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>▼</span>
+            </button>
+            {open && (
+              <div style={{ marginTop: 16, overflowX: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
+                  <thead>
+                    <tr>
+                      {['Date', 'Type', 'Streams', 'TikTok GMV', 'Shopee GMV', 'Total GMV'].map(h => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {megaDates.map((row, ri) => (
+                      <tr key={ri} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = ri % 2 === 0 ? SURFACE : SURFACE_RAISED)}
+                      >
+                        <td style={{ ...tdStyle, fontWeight: 600 }}>{new Date(row.date).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: subColor(row.sub) }}>{subLabel(row.sub)}</td>
+                        <td style={tdStyle}>{row.count}</td>
+                        <td style={{ ...tdStyle, color: row.tiktokGmv > 0 ? TIKTOK_COLOR : TEXT_SEC }}>{row.tiktokGmv > 0 ? fmt(row.tiktokGmv) : '—'}</td>
+                        <td style={{ ...tdStyle, color: row.shopeeGmv > 0 ? SHOPEE_COLOR : TEXT_SEC }}>{row.shopeeGmv > 0 ? fmt(row.shopeeGmv) : '—'}</td>
+                        <td style={{ ...tdStyle, fontWeight: 700, color: ACCENT }}>{fmt(row.totalGmv)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
-      {/* Stream list filtered by D/D-1/All */}
-      <div style={cardStyle}>
-        <SectionLabel>
-          {subFilter === 'All' ? 'All Mega Streams' : subFilter === 'D' ? '🔥 D Day Streams' : '🔥 D-1 Streams'} ({sortedDisplayed.length})
-        </SectionLabel>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
-            <thead>
-              <tr>
-                {['Date', 'Type', 'Day', 'Time', 'Streamer', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Status'].map(h => (
-                  <th key={h} style={{ ...thStyle, fontSize: '0.65rem' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedDisplayed.map((s, si) => {
-                const sub = getMegaSubtype(s.date)
-                return (
-                  <tr key={si} style={{ background: si % 2 === 0 ? SURFACE : SURFACE_RAISED }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = si % 2 === 0 ? SURFACE : SURFACE_RAISED)}
-                  >
-                    <td style={tdStyle}>{new Date(s.date).toLocaleDateString('en-SG')}</td>
-                    <td style={{ ...tdStyle, fontWeight: 700, color: sub === 'D' ? '#F59E0B' : '#FBBF24' }}>{sub === 'D' ? '🔥 D' : '🔥 D-1'}</td>
-                    <td style={tdStyle}>{s.dayOfWeek}</td>
-                    <td style={tdStyle}>{fmt12(s.startHour, s.startMinute)}</td>
-                    <td style={tdStyle}>{s.talent}</td>
-                    <td style={tdStyle}>{s.brand ?? '—'}</td>
-                    <td style={tdStyle}>{s.platform ?? '—'}</td>
-                    <td style={{ ...tdStyle, color: s.tiktokGmv > 0 ? TIKTOK_COLOR : TEXT_SEC }}>{s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—'}</td>
-                    <td style={{ ...tdStyle, color: s.shopeeGmv > 0 ? SHOPEE_COLOR : TEXT_SEC }}>{s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—'}</td>
-                    <td style={{ ...tdStyle, fontWeight: 600, color: ACCENT }}>{fmt(s.totalGmv)}</td>
-                    <td style={tdStyle}><StatusBadge status={s.status} /></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Stream list — collapsible */}
+      {(() => {
+        const [open, setOpen] = useState(false)
+        const label = subFilter === 'All' ? 'All Mega Streams' : subFilter === 'D' ? '🔥 D Day Streams' : '🔥 D-1 Streams'
+        return (
+          <div style={cardStyle}>
+            <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: TEXT_SEC }}>{label} ({sortedDisplayed.length})</span>
+              <span style={{ color: TEXT_SEC, fontSize: '0.75rem', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>▼</span>
+            </button>
+            {open && (
+              <div style={{ marginTop: 16, overflowX: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.78rem' }}>
+                  <thead>
+                    <tr>
+                      {['Date', 'Type', 'Day', 'Time', 'Streamer', 'Brand', 'Platform', 'TikTok GMV', 'Shopee GMV', 'Total GMV', 'Status'].map(h => (
+                        <th key={h} style={{ ...thStyle, fontSize: '0.65rem' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedDisplayed.map((s, si) => {
+                      const sub = getMegaSubtype(s.date)
+                      return (
+                        <tr key={si} style={{ background: si % 2 === 0 ? SURFACE : SURFACE_RAISED }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-hover)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = si % 2 === 0 ? SURFACE : SURFACE_RAISED)}
+                        >
+                          <td style={tdStyle}>{new Date(s.date).toLocaleDateString('en-SG')}</td>
+                          <td style={{ ...tdStyle, fontWeight: 700, color: sub === 'D' ? '#F59E0B' : '#FBBF24' }}>{sub === 'D' ? '🔥 D' : '🔥 D-1'}</td>
+                          <td style={tdStyle}>{s.dayOfWeek}</td>
+                          <td style={tdStyle}>{fmt12(s.startHour, s.startMinute)}</td>
+                          <td style={tdStyle}>{s.talent}</td>
+                          <td style={tdStyle}>{s.brand ?? '—'}</td>
+                          <td style={tdStyle}>{s.platform ?? '—'}</td>
+                          <td style={{ ...tdStyle, color: s.tiktokGmv > 0 ? TIKTOK_COLOR : TEXT_SEC }}>{s.tiktokGmv > 0 ? fmt(s.tiktokGmv) : '—'}</td>
+                          <td style={{ ...tdStyle, color: s.shopeeGmv > 0 ? SHOPEE_COLOR : TEXT_SEC }}>{s.shopeeGmv > 0 ? fmt(s.shopeeGmv) : '—'}</td>
+                          <td style={{ ...tdStyle, fontWeight: 600, color: ACCENT }}>{fmt(s.totalGmv)}</td>
+                          <td style={tdStyle}><StatusBadge status={s.status} /></td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
     </div>
   )
