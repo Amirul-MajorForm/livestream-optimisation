@@ -1964,7 +1964,7 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
 
   const byTalent = useMemo(() => {
     const m: Record<string, number> = {}
-    planned.forEach(s => { m[s.talent] = (m[s.talent] ?? 0) + 1 })
+    planned.forEach(s => { const k = s.talent || 'TBD'; m[k] = (m[k] ?? 0) + 1 })
     return Object.entries(m).sort((a, b) => b[1] - a[1])
   }, [planned])
 
@@ -2204,7 +2204,7 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                 }}>{dayType === 'Mega' ? '🔥 Mega' : 'BAU'}</span>,
                 s.dayOfWeek,
                 `${fmt12(s.startHour, s.startMinute)}–${s.endIsNextDay ? '12am' : fmt12(s.endHour, s.endMinute)}`,
-                s.talent,
+                s.talent || '— TBD —',
                 s.brand ?? '—',
                 s.platform ?? '—',
                 s.hours > 0 ? `${s.hours.toFixed(1)}h` : '—',
@@ -2256,8 +2256,8 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
                             <div key={si} style={{
                               fontSize: '0.6rem', lineHeight: 1.3, marginBottom: 2, padding: '2px 4px', borderRadius: 3,
                               background: bc.bg, color: bc.text, wordBreak: 'break-word',
-                            }} title={`${fmt12(s.startHour, s.startMinute)} ${s.talent}${s.brand ? ` · ${s.brand}` : ''}${s.platform ? ` · ${s.platform}` : ''}`}>
-                              <span style={{ fontWeight: 700 }}>{fmt12(s.startHour, s.startMinute)}</span>{' '}{s.talent}{s.brand ? ` · ${s.brand}` : ''}{s.platform ? ` · ${s.platform}` : ''}
+                            }} title={`${fmt12(s.startHour, s.startMinute)} ${s.talent || 'TBD'}${s.brand ? ` · ${s.brand}` : ''}${s.platform ? ` · ${s.platform}` : ''}`}>
+                              <span style={{ fontWeight: 700 }}>{fmt12(s.startHour, s.startMinute)}</span>{' '}{s.talent || 'TBD'}{s.brand ? ` · ${s.brand}` : ''}{s.platform ? ` · ${s.platform}` : ''}
                             </div>
                           )})}
                         </div>

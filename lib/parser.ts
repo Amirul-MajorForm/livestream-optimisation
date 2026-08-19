@@ -45,12 +45,20 @@ function parseGoogleTime(serial: number): { hour: number; minute: number; isNext
 export function parseRows(rawRows: unknown[][]): Stream[] {
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+  const TBC_RE = /\btbc\b|scheduled/i
+
   return rawRows
     .filter(row => {
       const dateVal = row[2]
+      if (typeof dateVal !== 'number' || dateVal <= 40000) return false
       const talent = row[6]
-      return typeof dateVal === 'number' && dateVal > 40000 &&
-             typeof talent === 'string' && talent.trim().length > 0
+      const hasTalent = typeof talent === 'string' && talent.trim().length > 0
+      // Allow talent-less rows that are explicitly flagged as TBC/Scheduled
+      const flag   = typeof row[0] === 'string' ? row[0] : ''
+      const status = typeof row[11] === 'string' ? row[11] : ''
+      const notes  = typeof row[25] === 'string' ? row[25] : ''
+      const isPrePlanned = TBC_RE.test(flag) || TBC_RE.test(status) || TBC_RE.test(notes)
+      return hasTalent || isPrePlanned
     })
     .map(row => {
       const date = parseGoogleDate(row[2] as number)
