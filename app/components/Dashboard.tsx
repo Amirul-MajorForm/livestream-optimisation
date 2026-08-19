@@ -527,7 +527,7 @@ export default function Dashboard() {
       {page === 'brands' && <BrandsPage streams={filtered} accountFilter={selectedAccountTypes} setAccountFilter={setSelectedAccountTypes} />}
       {page === 'mega' && <MegaPage streams={filtered} />}
       {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
-      {page === 'planning' && <PlanningPage allStreams={allStreams} selectedBrands={selectedBrands} />}
+      {page === 'planning' && <PlanningPage allStreams={filtered} selectedBrands={selectedBrands} />}
       {page === 'ask' && (
         <AskPage
           streams={filtered}
@@ -1950,15 +1950,15 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
   const isMobile = useMobile()
   const planned = useMemo(() => {
     const now = new Date()
+    // allStreams is already month/status/platform/brand filtered by the parent;
+    // only keep future slots with no recorded GMV (i.e. not yet streamed)
     return allStreams.filter(s => {
-      // A future slot with no actual GMV is "planned"
       const d = new Date(s.date)
       if (d < now) return false
       if (s.totalGmv > 0) return false
-      if (selectedBrands.length > 0 && !selectedBrands.includes(s.brand ?? '')) return false
       return true
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }, [allStreams, selectedBrands])
+  }, [allStreams])
 
   const historical = useMemo(() =>
     allStreams.filter(s => ['Paid', 'Invoice Sent', 'Invoice Pending'].includes(s.status ?? ''))
