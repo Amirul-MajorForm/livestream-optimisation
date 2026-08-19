@@ -1951,10 +1951,12 @@ function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; se
   const planned = useMemo(() => {
     const now = new Date()
     return allStreams.filter(s => {
-      if (!isTBC(s)) return false
-      if (selectedBrands.length > 0 && !selectedBrands.includes(s.brand ?? '')) return false
+      // A future slot with no actual GMV is "planned"
       const d = new Date(s.date)
-      return d >= now
+      if (d < now) return false
+      if (s.totalGmv > 0) return false
+      if (selectedBrands.length > 0 && !selectedBrands.includes(s.brand ?? '')) return false
+      return true
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [allStreams, selectedBrands])
 
