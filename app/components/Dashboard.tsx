@@ -84,7 +84,7 @@ const fmt12 = (h: number, m = 0) => {
   return m === 0 ? `${hour}${period}` : `${hour}:${String(m).padStart(2, '0')}${period}`
 }
 
-type Page = 'overview' | 'streamers' | 'brands' | 'mega' | 'timeslots' | 'ask' | 'planning' | 'reviews-scraper' | 'search-scraper'
+type Page = 'overview' | 'streamers' | 'brands' | 'mega' | 'timeslots' | 'ask' | 'planning'
 
 const STATUS_OPTIONS = ['All', 'Paid', 'Invoice Sent', 'Invoice Pending', 'Scheduled', 'Cancelled', 'Paid to Host, Pending Payment From Brand']
 const TIME_BUCKETS = ['12pm–2pm', '2pm–4pm', '4pm–6pm', '6pm–8pm', '8pm–10pm', '10pm–12am']
@@ -512,17 +512,14 @@ export default function Dashboard() {
 
   const PAGE_ICONS: Record<Page, string> = {
     overview: '◎', streamers: '👤', brands: '🏷', mega: '🔥', timeslots: '🕐', planning: '📋', ask: '✦',
-    'reviews-scraper': '⭐', 'search-scraper': '🔍',
   }
   const PAGE_LABELS: Record<Page, string> = {
     overview: 'Overview', streamers: 'Streamers', brands: 'Brands',
     mega: 'Mega', timeslots: 'Timeslots', planning: 'Planning', ask: 'Ask',
-    'reviews-scraper': 'Reviews Scraper', 'search-scraper': 'Search Scraper',
   }
 
   const NAV_SECTIONS: { label: string; pages: Page[] }[] = [
     { label: 'Livestream', pages: ['overview', 'streamers', 'brands', 'mega', 'timeslots', 'planning', 'ask'] },
-    { label: 'Tools', pages: ['reviews-scraper', 'search-scraper'] },
   ]
 
   const activeFilters = selectedStatuses.length + selectedMonths.length + selectedPlatforms.length + selectedBrands.length + selectedAccountTypes.length
@@ -535,8 +532,6 @@ export default function Dashboard() {
       {page === 'mega' && <MegaPage streams={filtered} />}
       {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
       {page === 'planning' && <PlanningPage allStreams={filtered} selectedBrands={selectedBrands} />}
-      {page === 'reviews-scraper' && <ReviewsScraperPage />}
-      {page === 'search-scraper' && <SearchScraperPage />}
       {page === 'ask' && (
         <AskPage
           streams={filtered}
@@ -728,7 +723,7 @@ export default function Dashboard() {
             background: SURFACE, borderTop: `1px solid ${BORDER}`,
             display: 'flex', height: 56,
           }}>
-            {(['overview', 'streamers', 'brands', 'mega', 'timeslots', 'planning', 'ask', 'reviews-scraper', 'search-scraper'] as Page[]).map(p => {
+            {(['overview', 'streamers', 'brands', 'mega', 'timeslots', 'planning', 'ask'] as Page[]).map(p => {
               const active = page === p
               return (
                 <button key={p} onClick={() => { setPage(p); setFiltersOpen(false) }} style={{
@@ -1987,241 +1982,6 @@ function isTBC(s: Stream): boolean {
     notes.includes('TBC')
   )
 }
-
-// ── Google Reviews Scraper ──────────────────────────────────────────────────
-function ReviewsScraperPage() {
-  const [url, setUrl] = useState('')
-  const [maxReviews, setMaxReviews] = useState('50')
-  const [status, setStatus] = useState<'idle' | 'running' | 'done'>('idle')
-  const [results, setResults] = useState<{ author: string; rating: number; date: string; text: string }[]>([])
-
-  const cardStyle: React.CSSProperties = {
-    background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '20px 24px',
-  }
-  const inputStyle: React.CSSProperties = {
-    width: '100%', background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 8,
-    padding: '10px 14px', color: TEXT_PRI, fontSize: '0.875rem', outline: 'none',
-  }
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.75rem', fontWeight: 600, color: TEXT_SEC, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'block',
-  }
-
-  const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n)
-
-  return (
-    <div style={{ padding: '28px 32px', maxWidth: 860, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: TEXT_PRI, margin: 0, fontFamily: 'var(--font-space-grotesk)' }}>
-          ⭐ Google Reviews Scraper
-        </h2>
-        <p style={{ margin: '4px 0 0', color: TEXT_SEC, fontSize: '0.85rem' }}>
-          Extract Google Maps reviews for any business. Paste the Google Maps URL below.
-        </p>
-      </div>
-
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={labelStyle}>Google Maps URL</label>
-            <input
-              style={inputStyle}
-              placeholder="https://maps.google.com/..."
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-            <div style={{ flex: '0 0 160px' }}>
-              <label style={labelStyle}>Max Reviews</label>
-              <input
-                type="number"
-                style={{ ...inputStyle, width: '100%' }}
-                value={maxReviews}
-                min={1}
-                max={500}
-                onChange={e => setMaxReviews(e.target.value)}
-              />
-            </div>
-            <button
-              onClick={() => { setStatus('running'); setTimeout(() => { setStatus('done'); setResults([
-                { author: 'Sarah L.', rating: 5, date: '2 weeks ago', text: 'Amazing service, highly recommend!' },
-                { author: 'James T.', rating: 4, date: '1 month ago', text: 'Great experience overall. Will come back.' },
-                { author: 'Mei Y.', rating: 3, date: '2 months ago', text: 'Decent but room for improvement on wait times.' },
-              ]) }, 1800) }}
-              disabled={!url || status === 'running'}
-              style={{
-                padding: '10px 24px', borderRadius: 8, border: 'none', cursor: url && status !== 'running' ? 'pointer' : 'not-allowed',
-                background: url && status !== 'running' ? ACCENT : BORDER,
-                color: url && status !== 'running' ? '#0A0A0A' : TEXT_SEC,
-                fontWeight: 700, fontSize: '0.875rem', transition: 'background 0.15s',
-              }}
-            >
-              {status === 'running' ? 'Scraping…' : 'Scrape Reviews'}
-            </button>
-            {status === 'done' && (
-              <button
-                onClick={() => {
-                  const csv = ['Author,Rating,Date,Review'].concat(results.map(r => `"${r.author}",${r.rating},"${r.date}","${r.text.replace(/"/g, '""')}"`)).join('\n')
-                  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'reviews.csv'; a.click()
-                }}
-                style={{
-                  padding: '10px 20px', borderRadius: 8, border: `1px solid ${BORDER}`, cursor: 'pointer',
-                  background: 'transparent', color: TEXT_SEC, fontSize: '0.875rem',
-                }}
-              >↓ Export CSV</button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {status === 'done' && results.length > 0 && (
-        <div style={cardStyle}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: TEXT_SEC, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
-            {results.length} Reviews Found
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {results.map((r, i) => (
-              <div key={i} style={{ padding: '14px 16px', background: SURFACE_RAISED, borderRadius: 8, border: `1px solid ${BORDER}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div>
-                    <span style={{ fontWeight: 600, color: TEXT_PRI, fontSize: '0.875rem' }}>{r.author}</span>
-                    <span style={{ marginLeft: 10, color: '#FBBF24', fontSize: '0.8rem' }}>{stars(r.rating)}</span>
-                  </div>
-                  <span style={{ fontSize: '0.7rem', color: TEXT_SEC }}>{r.date}</span>
-                </div>
-                <p style={{ margin: 0, color: TEXT_SEC, fontSize: '0.82rem', lineHeight: 1.5 }}>{r.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {status === 'idle' && (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px', color: TEXT_SEC, fontSize: '0.85rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: 12 }}>⭐</div>
-          Enter a Google Maps URL and click Scrape Reviews to get started.
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Google Search Results Scraper ───────────────────────────────────────────
-function SearchScraperPage() {
-  const [query, setQuery] = useState('')
-  const [numResults, setNumResults] = useState('10')
-  const [status, setStatus] = useState<'idle' | 'running' | 'done'>('idle')
-  const [results, setResults] = useState<{ position: number; title: string; url: string; snippet: string }[]>([])
-
-  const cardStyle: React.CSSProperties = {
-    background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: '20px 24px',
-  }
-  const inputStyle: React.CSSProperties = {
-    width: '100%', background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 8,
-    padding: '10px 14px', color: TEXT_PRI, fontSize: '0.875rem', outline: 'none',
-  }
-  const labelStyle: React.CSSProperties = {
-    fontSize: '0.75rem', fontWeight: 600, color: TEXT_SEC, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'block',
-  }
-
-  return (
-    <div style={{ padding: '28px 32px', maxWidth: 860, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: TEXT_PRI, margin: 0, fontFamily: 'var(--font-space-grotesk)' }}>
-          🔍 Google Search Results Scraper
-        </h2>
-        <p style={{ margin: '4px 0 0', color: TEXT_SEC, fontSize: '0.85rem' }}>
-          Extract Google Search results for any keyword or query. Useful for SEO research and competitor tracking.
-        </p>
-      </div>
-
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={labelStyle}>Search Query</label>
-            <input
-              style={inputStyle}
-              placeholder='e.g. "best skincare brand Singapore"'
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-            <div style={{ flex: '0 0 160px' }}>
-              <label style={labelStyle}>Number of Results</label>
-              <input
-                type="number"
-                style={{ ...inputStyle, width: '100%' }}
-                value={numResults}
-                min={1}
-                max={100}
-                onChange={e => setNumResults(e.target.value)}
-              />
-            </div>
-            <button
-              onClick={() => { setStatus('running'); setTimeout(() => { setStatus('done'); setResults([
-                { position: 1, title: 'Best Skincare Brands in Singapore 2024', url: 'https://example.com/skincare-sg', snippet: 'Discover the top skincare brands available in Singapore, from luxury to drugstore picks.' },
-                { position: 2, title: 'Top 10 Skincare Brands Singaporeans Love', url: 'https://example2.com/top-skincare', snippet: 'A curated list of the best skincare brands trusted by Singaporean consumers.' },
-                { position: 3, title: 'Singapore Skincare Market Overview', url: 'https://example3.com/market', snippet: 'In-depth analysis of the skincare market in Singapore with consumer trends.' },
-              ]) }, 1800) }}
-              disabled={!query || status === 'running'}
-              style={{
-                padding: '10px 24px', borderRadius: 8, border: 'none', cursor: query && status !== 'running' ? 'pointer' : 'not-allowed',
-                background: query && status !== 'running' ? ACCENT : BORDER,
-                color: query && status !== 'running' ? '#0A0A0A' : TEXT_SEC,
-                fontWeight: 700, fontSize: '0.875rem', transition: 'background 0.15s',
-              }}
-            >
-              {status === 'running' ? 'Scraping…' : 'Scrape Results'}
-            </button>
-            {status === 'done' && (
-              <button
-                onClick={() => {
-                  const csv = ['Position,Title,URL,Snippet'].concat(results.map(r => `${r.position},"${r.title}","${r.url}","${r.snippet.replace(/"/g, '""')}"`)).join('\n')
-                  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'search-results.csv'; a.click()
-                }}
-                style={{
-                  padding: '10px 20px', borderRadius: 8, border: `1px solid ${BORDER}`, cursor: 'pointer',
-                  background: 'transparent', color: TEXT_SEC, fontSize: '0.875rem',
-                }}
-              >↓ Export CSV</button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {status === 'done' && results.length > 0 && (
-        <div style={cardStyle}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: TEXT_SEC, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
-            {results.length} Results — "{query}"
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {results.map((r, i) => (
-              <div key={i} style={{ padding: '14px 16px', background: SURFACE_RAISED, borderRadius: 8, border: `1px solid ${BORDER}`, display: 'flex', gap: 14 }}>
-                <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 6, background: `rgba(200,245,74,0.1)`, border: `1px solid rgba(200,245,74,0.2)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: ACCENT }}>
-                  {r.position}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, color: TEXT_PRI, fontSize: '0.875rem', marginBottom: 2 }}>{r.title}</div>
-                  <div style={{ fontSize: '0.7rem', color: ACCENT, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.url}</div>
-                  <p style={{ margin: 0, color: TEXT_SEC, fontSize: '0.8rem', lineHeight: 1.5 }}>{r.snippet}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {status === 'idle' && (
-        <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px', color: TEXT_SEC, fontSize: '0.85rem' }}>
-          <div style={{ fontSize: '2rem', marginBottom: 12 }}>🔍</div>
-          Enter a search query and click Scrape Results to get started.
-        </div>
-      )}
-    </div>
-  )
-}
-
 interface ChatMsg { role: 'user' | 'assistant'; text: string }
 
 function PlanningPage({ allStreams, selectedBrands }: { allStreams: Stream[]; selectedBrands: string[] }) {
