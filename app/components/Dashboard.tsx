@@ -985,6 +985,42 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
     return new Date(Number(y), Number(m) - 1, 1).toLocaleString('en-SG', { month: 'short', year: '2-digit' })
   }
 
+  // Per-column min/max for conditional formatting
+  const monthStats = useMemo(() => {
+    const stats: Record<string, { min: number; max: number }> = {}
+    allMonths.forEach(m => {
+      const vals = talentData.map(t => {
+        const d = new Date(t.streams[0]?.date ?? 0)
+        void d
+        let count = 0
+        t.streams.forEach(s => {
+          const sd = new Date(s.date)
+          const k = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, '0')}`
+          if (k === m) count++
+        })
+        return count
+      }).filter(v => v > 0)
+      stats[m] = { min: Math.min(...vals.length ? vals : [0]), max: Math.max(...vals.length ? vals : [0]) }
+    })
+    return stats
+  }, [allMonths, talentData])
+
+  const cellColor = (n: number, monthKey: string): React.CSSProperties => {
+    if (n === 0) return {}
+    const { min, max } = monthStats[monthKey] ?? { min: 0, max: 0 }
+    if (max === min) return { background: 'rgba(200,245,74,0.15)', color: TEXT_PRI }
+    const ratio = (n - min) / (max - min) // 0 = min (red), 1 = max (green)
+    if (ratio >= 0.99) return { background: 'rgba(52,211,153,0.25)', color: '#34D399', fontWeight: 700 }
+    if (ratio <= 0.01) return { background: 'rgba(248,113,113,0.2)', color: '#F87171', fontWeight: 600 }
+    // interpolate: red → amber → green
+    if (ratio < 0.5) {
+      const t = ratio * 2
+      return { background: `rgba(251,191,36,${0.1 + 0.1 * t})`, color: '#FBBF24', fontWeight: 600 }
+    }
+    const t = (ratio - 0.5) * 2
+    return { background: `rgba(52,211,153,${0.1 + 0.15 * t})`, color: '#6EE7B7', fontWeight: 600 }
+  }
+
   const colStyle = (col: SortCol): React.CSSProperties => ({
     ...thStyle, cursor: 'pointer',
     color: sortCol === col ? ACCENT : TEXT_SEC,
@@ -1014,7 +1050,6 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
                   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
                   countByMonth[key] = (countByMonth[key] ?? 0) + 1
                 })
-                const maxCount = Math.max(...allMonths.map(m => countByMonth[m] ?? 0))
                 return (
                   <tr key={t.talent} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
                     <td style={{ ...tdStyle, fontWeight: 600, position: 'sticky', left: 0, background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED, zIndex: 1 }}>
@@ -1022,11 +1057,9 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
                     </td>
                     {allMonths.map(m => {
                       const n = countByMonth[m] ?? 0
+                      const fmt = cellColor(n, m)
                       return (
-                        <td key={m} style={{ ...tdStyle, textAlign: 'center', color: n > 0 ? TEXT_PRI : TEXT_SEC,
-                          background: n > 0 ? `rgba(200,245,74,${0.06 + 0.14 * (n / (maxCount || 1))})` : undefined,
-                          fontWeight: n > 0 ? 600 : 400,
-                        }}>
+                        <td key={m} style={{ ...tdStyle, textAlign: 'center', ...fmt, color: n > 0 ? fmt.color : TEXT_SEC }}>
                           {n > 0 ? n : '—'}
                         </td>
                       )
