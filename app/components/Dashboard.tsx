@@ -970,7 +970,20 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
 
   const sortArrow = (col: SortCol) => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
 
-  const chartData = sorted.map(t => ({ name: t.talent, gmv: t.totalGmv }))
+  // Monthly stream count matrix
+  const allMonths = useMemo(() => {
+    const set = new Set<string>()
+    streams.forEach(s => {
+      const d = new Date(s.date)
+      set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+    })
+    return Array.from(set).sort()
+  }, [streams])
+
+  const monthLabel = (key: string) => {
+    const [y, m] = key.split('-')
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleString('en-SG', { month: 'short', year: '2-digit' })
+  }
 
   const colStyle = (col: SortCol): React.CSSProperties => ({
     ...thStyle, cursor: 'pointer',
@@ -981,15 +994,50 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={cardStyle}>
-        <SectionLabel>GMV by Streamer</SectionLabel>
-        <ResponsiveContainer width="100%" height={Math.max(isMobile ? 140 : 180, chartData.length * (isMobile ? 28 : 36))}>
-          <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 20, bottom: 4, left: 60 }}>
-            <XAxis type="number" tick={{ fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} />
-            <YAxis type="category" dataKey="name" tick={{ fill: TEXT_PRI, fontSize: 12 }} axisLine={false} tickLine={false} width={56} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-            <Bar dataKey="gmv" name="Total GMV" fill={ACCENT} radius={[0,3,3,0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        <SectionLabel>Streams per Month by Streamer</SectionLabel>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <thead>
+              <tr>
+                <th style={{ ...thStyle, textAlign: 'left', position: 'sticky', left: 0, background: SURFACE, zIndex: 1, minWidth: 120 }}>Streamer</th>
+                {allMonths.map(m => (
+                  <th key={m} style={{ ...thStyle, textAlign: 'center', minWidth: 64 }}>{monthLabel(m)}</th>
+                ))}
+                <th style={{ ...thStyle, textAlign: 'center', minWidth: 60, color: ACCENT }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((t, ri) => {
+                const countByMonth: Record<string, number> = {}
+                t.streams.forEach(s => {
+                  const d = new Date(s.date)
+                  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                  countByMonth[key] = (countByMonth[key] ?? 0) + 1
+                })
+                const maxCount = Math.max(...allMonths.map(m => countByMonth[m] ?? 0))
+                return (
+                  <tr key={t.talent} style={{ background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED }}>
+                    <td style={{ ...tdStyle, fontWeight: 600, position: 'sticky', left: 0, background: ri % 2 === 0 ? SURFACE : SURFACE_RAISED, zIndex: 1 }}>
+                      {t.talent || '— TBD —'}
+                    </td>
+                    {allMonths.map(m => {
+                      const n = countByMonth[m] ?? 0
+                      return (
+                        <td key={m} style={{ ...tdStyle, textAlign: 'center', color: n > 0 ? TEXT_PRI : TEXT_SEC,
+                          background: n > 0 ? `rgba(200,245,74,${0.06 + 0.14 * (n / (maxCount || 1))})` : undefined,
+                          fontWeight: n > 0 ? 600 : 400,
+                        }}>
+                          {n > 0 ? n : '—'}
+                        </td>
+                      )
+                    })}
+                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: ACCENT }}>{t.count}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div style={cardStyle}>
