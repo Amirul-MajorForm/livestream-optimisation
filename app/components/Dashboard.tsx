@@ -990,10 +990,9 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
     const stats: Record<string, { min: number; max: number }> = {}
     allMonths.forEach(m => {
       const vals = talentData.map(t => {
-        const d = new Date(t.streams[0]?.date ?? 0)
-        void d
         let count = 0
         t.streams.forEach(s => {
+          if ((s.status ?? '').toLowerCase().includes('cancel')) return
           const sd = new Date(s.date)
           const k = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, '0')}`
           if (k === m) count++
@@ -1046,6 +1045,7 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
               {sorted.map((t, ri) => {
                 const countByMonth: Record<string, number> = {}
                 t.streams.forEach(s => {
+                  if ((s.status ?? '').toLowerCase().includes('cancel')) return
                   const d = new Date(s.date)
                   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
                   countByMonth[key] = (countByMonth[key] ?? 0) + 1
