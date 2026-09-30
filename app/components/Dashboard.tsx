@@ -452,12 +452,12 @@ export default function Dashboard() {
 
   const filtered = useMemo(() => {
     return allStreams.filter(s => {
-      // Always exclude cancelled unless the user has explicitly filtered to show them
       const isCancelled = (s.status ?? '').toLowerCase().includes('cancel')
+      const isPrePlanned = !s.talent || s.talent.trim() === '' || isTBC(s)
       if (selectedStatuses.length > 0) {
         if (!selectedStatuses.includes(s.status ?? '')) return false
       } else {
-        if (isCancelled) return false
+        if (isCancelled || isPrePlanned) return false
       }
       if (selectedMonths.length > 0) {
         const d = new Date(s.date)
@@ -473,6 +473,23 @@ export default function Dashboard() {
       return true
     })
   }, [allStreams, selectedStatuses, selectedMonths, selectedPlatforms, selectedBrands, selectedAccountTypes])
+
+  const planningStreams = useMemo(() => {
+    return allStreams.filter(s => {
+      if (selectedMonths.length > 0) {
+        const d = new Date(s.date)
+        const m = `${d.toLocaleString('en-SG', { month: 'short' })} ${d.getFullYear()}`
+        if (!selectedMonths.includes(m)) return false
+      }
+      if (selectedPlatforms.length > 0) {
+        const p = s.platform ?? ''
+        if (!selectedPlatforms.some(plat => p.toLowerCase().includes(plat.toLowerCase()))) return false
+      }
+      if (selectedBrands.length > 0 && !selectedBrands.includes(s.brand ?? '')) return false
+      if (selectedAccountTypes.length > 0 && !selectedAccountTypes.includes(s.account ?? '')) return false
+      return true
+    })
+  }, [allStreams, selectedMonths, selectedPlatforms, selectedBrands, selectedAccountTypes])
 
   const askClaude = async () => {
     if (!question.trim() || streaming) return
@@ -537,7 +554,7 @@ export default function Dashboard() {
       {page === 'brands' && <BrandsPage streams={filtered} accountFilter={selectedAccountTypes} setAccountFilter={setSelectedAccountTypes} />}
       {page === 'mega' && <MegaPage streams={filtered} />}
       {page === 'timeslots' && <TimeslotsPage streams={filtered} />}
-      {page === 'planning' && <PlanningPage allStreams={filtered} selectedBrands={selectedBrands} />}
+      {page === 'planning' && <PlanningPage allStreams={planningStreams} selectedBrands={selectedBrands} />}
       {page === 'ask' && (
         <AskPage
           streams={filtered}
