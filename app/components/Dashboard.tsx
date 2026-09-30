@@ -452,7 +452,13 @@ export default function Dashboard() {
 
   const filtered = useMemo(() => {
     return allStreams.filter(s => {
-      if (selectedStatuses.length > 0 && !selectedStatuses.includes(s.status ?? '')) return false
+      // Always exclude cancelled unless the user has explicitly filtered to show them
+      const isCancelled = (s.status ?? '').toLowerCase().includes('cancel')
+      if (selectedStatuses.length > 0) {
+        if (!selectedStatuses.includes(s.status ?? '')) return false
+      } else {
+        if (isCancelled) return false
+      }
       if (selectedMonths.length > 0) {
         const d = new Date(s.date)
         const m = `${d.toLocaleString('en-SG', { month: 'short' })} ${d.getFullYear()}`
