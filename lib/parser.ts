@@ -67,7 +67,11 @@ export function parseRows(rawRows: unknown[][]): Stream[] {
 
       const startMins = start.hour * 60 + start.minute
       const endMins = end.isNextDay ? 24 * 60 : end.hour * 60 + end.minute
-      const hours = Math.max(0, (endMins - startMins) / 60)
+      const rawHours = Math.max(0, (endMins - startMins) / 60)
+
+      const platformStr = typeof row[10] === 'string' ? (row[10] as string).toLowerCase() : ''
+      const isBothPlatforms = platformStr.includes('tiktok') && platformStr.includes('shopee')
+      const hours = isBothPlatforms ? rawHours * 2 : rawHours
 
       const tiktokGmv = typeof row[12] === 'number' ? row[12] : 0
       const shopeeGmv = typeof row[13] === 'number' ? row[13] : 0
