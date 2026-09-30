@@ -203,8 +203,11 @@ function MultiSelect({
     else onChange([...selected, opt])
   }
 
-  const display = selected.length === 0 ? 'All' : selected.length === 1 ? selected[0] : `${selected.length} selected`
-  const active = selected.length > 0
+  const allSelected = options.length > 0 && selected.length === options.length
+  const selectAll = () => { onChange(allSelected ? [] : [...options]); }
+
+  const display = selected.length === 0 ? 'All' : selected.length === options.length ? 'All' : selected.length === 1 ? selected[0] : `${selected.length} selected`
+  const active = selected.length > 0 && selected.length < options.length
 
   return (
     <div ref={ref} style={{ position: 'relative', width: isMobile ? '100%' : 'auto' }}>
@@ -231,10 +234,23 @@ function MultiSelect({
           background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6,
           boxShadow: '0 4px 16px rgba(0,0,0,0.4)', minWidth: 180, maxHeight: 260, overflowY: 'auto',
         }}>
-          {selected.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', cursor: 'pointer', fontSize: '0.8rem', color: TEXT_PRI, borderBottom: `1px solid ${BORDER}`, fontWeight: 600 }}
+            onMouseEnter={e => (e.currentTarget.style.background = SURFACE)}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={el => { if (el) el.indeterminate = selected.length > 0 && !allSelected }}
+              onChange={selectAll}
+              style={{ accentColor: String(ACCENT), width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }}
+            />
+            Select all
+          </label>
+          {selected.length > 0 && !allSelected && (
             <button
               onClick={() => { onChange([]); setOpen(false) }}
-              style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', borderBottom: `1px solid ${BORDER}`, color: '#F87171', fontSize: '0.75rem', cursor: 'pointer' }}
+              style={{ width: '100%', textAlign: 'left', padding: '6px 12px', background: 'none', border: 'none', borderBottom: `1px solid ${BORDER}`, color: '#F87171', fontSize: '0.75rem', cursor: 'pointer' }}
             >
               Clear selection
             </button>
@@ -810,13 +826,18 @@ function OverviewPage({ streams, selectedPlatforms }: { streams: Stream[]; selec
       m[key].hours += s.hours
       m[key].count++
     })
-    return Object.entries(m)
+    const sorted = Object.entries(m)
       .sort((a, b) => new Date(a[0]) > new Date(b[0]) ? 1 : -1)
-      .map(([name, v]) => ({
+    return sorted.map(([name, v], i) => {
+      const prev = i > 0 ? sorted[i - 1][1].totalGmv : null
+      const mom = prev !== null && prev > 0 ? ((v.totalGmv - prev) / prev) * 100 : null
+      return {
         name,
         totalGmv: v.totalGmv,
         gmvPerHour: v.hours > 0 ? v.totalGmv / v.hours : 0,
-      }))
+        mom,
+      }
+    })
   }, [streams])
 
   const totalTiktok = streams.reduce((a, s) => a + s.tiktokGmv, 0)
@@ -868,19 +889,31 @@ function OverviewPage({ streams, selectedPlatforms }: { streams: Stream[]; selec
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 16 }}>
         <div style={{ flex: 2, ...cardStyle, padding: isMobile ? 14 : 20 }}>
           <SectionLabel>Monthly Total GMV &amp; GMV / Hour</SectionLabel>
-          <ResponsiveContainer width="100%" height={isMobile ? 160 : 220}>
-            <ComposedChart data={monthlyData} margin={{ top: 8, right: isMobile ? 4 : 48, bottom: 0, left: 0 }}>
+          <ResponsiveContainer width="100%" height={isMobile ? 180 : 240}>
+            <ComposedChart data={monthlyData} margin={{ top: 8, right: isMobile ? 4 : 56, bottom: 0, left: 0 }}>
               <XAxis dataKey="name" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} />
               <YAxis yAxisId="gmv" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} width={32} />
               <YAxis yAxisId="rate" orientation="right" tick={isMobile ? false : { fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} width={isMobile ? 0 : 48} />
-              <Tooltip contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }} formatter={(v, name) => [fmtShort(Number(v)), name === 'totalGmv' ? 'Total GMV' : 'GMV / Hour']} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+              <YAxis yAxisId="mom" orientation="right" tick={false} axisLine={false} tickLine={false} width={0} />
+              <Tooltip
+                contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }}
+                formatter={(v, name) => {
+                  if (name === 'totalGmv') return [fmtShort(Number(v)), 'Total GMV']
+                  if (name === 'gmvPerHour') return [fmtShort(Number(v)), 'GMV / Hour']
+                  if (name === 'mom') return v === null ? ['—', 'MoM %'] : [`${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(1)}%`, 'MoM % Change']
+                  return [v, name]
+                }}
+                cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+              />
               <Bar yAxisId="gmv" dataKey="totalGmv" name="totalGmv" fill={ACCENT} radius={[3,3,0,0]} opacity={0.85} />
               <Line yAxisId="rate" dataKey="gmvPerHour" name="gmvPerHour" stroke="#60A5FA" strokeWidth={2} dot={{ fill: '#60A5FA', r: 2 }} />
+              <Line yAxisId="mom" dataKey="mom" name="mom" stroke="#34D399" strokeWidth={2} strokeDasharray="4 3" dot={{ fill: '#34D399', r: 2 }} connectNulls={false} />
             </ComposedChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
             <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 10, background: ACCENT, borderRadius: 2, display: 'inline-block' }} /> Total GMV</span>
             <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 2, background: '#60A5FA', display: 'inline-block' }} /> GMV / Hour</span>
+            <span style={{ fontSize: '0.7rem', color: TEXT_SEC, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 10, height: 2, background: '#34D399', borderTop: '2px dashed #34D399', display: 'inline-block' }} /> MoM % Change</span>
           </div>
         </div>
         <div style={{ flex: 1, ...cardStyle, padding: isMobile ? 14 : 20 }}>
