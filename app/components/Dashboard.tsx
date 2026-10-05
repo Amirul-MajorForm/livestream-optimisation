@@ -816,18 +816,17 @@ function OverviewPage({ streams, selectedPlatforms }: { streams: Stream[]; selec
   const monthlyData = useMemo(() => {
     const onlyTiktok = selectedPlatforms.length === 1 && selectedPlatforms[0].toLowerCase() === 'tiktok'
     const onlyShopee = selectedPlatforms.length === 1 && selectedPlatforms[0].toLowerCase() === 'shopee'
-    const m: Record<string, { totalGmv: number; hours: number; count: number }> = {}
+    const m: Record<string, { totalGmv: number; hours: number; count: number; ts: number }> = {}
     streams.forEach(s => {
       const d = new Date(s.date)
       const key = `${d.toLocaleString('en-SG', { month: 'short' })} ${d.getFullYear()}`
-      if (!m[key]) m[key] = { totalGmv: 0, hours: 0, count: 0 }
+      if (!m[key]) m[key] = { totalGmv: 0, hours: 0, count: 0, ts: new Date(d.getFullYear(), d.getMonth(), 1).getTime() }
       const gmv = onlyTiktok ? s.tiktokGmv : onlyShopee ? s.shopeeGmv : s.totalGmv
       m[key].totalGmv += gmv
       m[key].hours += s.hours
       m[key].count++
     })
-    const sorted = Object.entries(m)
-      .sort((a, b) => new Date(a[0]) > new Date(b[0]) ? 1 : -1)
+    const sorted = Object.entries(m).sort((a, b) => a[1].ts - b[1].ts)
     return sorted.map(([name, v], i) => {
       const prev = i > 0 ? sorted[i - 1][1].totalGmv : null
       const mom = prev !== null && prev > 0 ? ((v.totalGmv - prev) / prev) * 100 : null
@@ -894,7 +893,7 @@ function OverviewPage({ streams, selectedPlatforms }: { streams: Stream[]; selec
               <XAxis dataKey="name" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} />
               <YAxis yAxisId="gmv" tick={{ fill: TEXT_SEC, fontSize: isMobile ? 9 : 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} width={32} />
               <YAxis yAxisId="rate" orientation="right" tick={isMobile ? false : { fill: TEXT_SEC, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${(v/1000).toFixed(0)}K`} width={isMobile ? 0 : 48} />
-              <YAxis yAxisId="mom" orientation="right" tick={false} axisLine={false} tickLine={false} width={0} />
+              <YAxis yAxisId="mom" orientation="right" tick={false} axisLine={false} tickLine={false} width={0} domain={['auto', 'auto']} />
               <Tooltip
                 contentStyle={{ background: SURFACE_RAISED, border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: '0.8rem' }}
                 formatter={(v, name) => {
