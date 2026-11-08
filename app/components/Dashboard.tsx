@@ -979,8 +979,8 @@ type SortDir = 'asc' | 'desc'
 
 function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; expanded: string | null; setExpanded: (v: string | null) => void }) {
   const isMobile = useMobile()
-  const [sortCol, setSortCol] = useState<SortCol>('totalGmv')
-  const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [sortCol, setSortCol] = useState<SortCol>('talent')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   const talentData = useMemo(() => {
     const m: Record<string, { streams: Stream[] }> = {}
@@ -1123,6 +1123,24 @@ function StreamersPage({ streams, expanded, setExpanded }: { streams: Stream[]; 
                   </tr>
                 )
               })}
+              <tr style={{ borderTop: `2px solid ${BORDER}`, background: SURFACE_RAISED }}>
+                <td style={{ ...tdStyle, fontWeight: 700, color: TEXT_PRI, position: 'sticky', left: 0, background: SURFACE_RAISED, zIndex: 1 }}>Total</td>
+                {allMonths.map(monthKey => {
+                  const total = sorted.reduce((sum, t) => {
+                    t.streams.forEach(s => {
+                      if ((s.status ?? '').toLowerCase().includes('cancel')) return
+                      const d = new Date(s.date)
+                      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                      if (k === monthKey) sum++
+                    })
+                    return sum
+                  }, 0)
+                  return (
+                    <td key={monthKey} style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: ACCENT }}>{total > 0 ? total : '—'}</td>
+                  )
+                })}
+                <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: ACCENT }}>{sorted.reduce((s, t) => s + t.count, 0)}</td>
+              </tr>
             </tbody>
           </table>
         </div>
